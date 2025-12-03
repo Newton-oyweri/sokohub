@@ -1,0 +1,30 @@
+
+{% extends 'base.html' %}
+
+{% block title %}student information page{% endblock %}
+
+{% block content %}
+<p>message page</p>
+
+
+<table class="table table-hover" style="   border: 2px solid black; " >
+    <thead>
+        <th style="   border: 2px solid black; ">name</th>
+        <th style="   border: 2px solid black; ">age</th>
+        <th  style="   border: 2px solid black; ">class</th>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr style="   border: 2px solid rgb(235, 57, 57); ">
+            <td style="   border: 2px solid black; " >{{ student.name }}</td>
+<td style="   border: 2px solid black; ">{{ student.age }}</td>
+<td  style="   border: 2px solid black; ">{{ student.course }}</td>
+
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
+
+

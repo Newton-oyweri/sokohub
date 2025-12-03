@@ -39,13 +39,27 @@ def signup(request):
 def index(request):
     return render(request, 'home.html')
 
+@login_required(login_url='login')
+def cart(request):
+    return render(request, 'cart.html')
+
+
+@login_required(login_url='login')
+def messages(request):
+    return render(request, 'messages.html')
+
+@login_required(login_url='login')
+def store(request):
+    return render(request, 'store.html')
+
 def logout_view(request):
     logout(request)
     return redirect('login')
 
 
 @login_required(login_url='login')
-def student(request):
+def account(request):
     students = Student.objects.all()
-    return render(request, 'student.html' , { 'students': students})
+    return render(request, 'account.html' , { 'students': students})
+
 
