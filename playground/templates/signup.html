@@ -1,12 +1,94 @@
-
 {% extends 'base.html' %}
 
-{% block title %}login page{% endblock %}
-{% block content %}
-<form method="POST">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Sign Up</button>
-</form>
+{% block title %}Login Page{% endblock %}
 
+{% block content %}
+<div class="auth-page-wrapper">
+
+    <form method="POST" class="auth-form">
+        {% csrf_token %}
+
+        <h2 class="form-title">Sign Up</h2>
+
+        <!-- Django form fields -->
+        {{ form.as_p }}
+
+        <!-- Submit button -->
+        <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+
+        <!-- Already have account -->
+        <p class="text-center mt-3">
+            Already have an account?
+        </p>
+        <div class="text-center">
+            <a href="{% url 'login' %}" class="btn btn-outline-primary w-50">Login</a>
+        </div>
+    </form>
+
+</div>
+
+<style>
+    /* Center the form on the page */
+    .auth-page-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        background: #f8f9fa; /* light background */
+        padding: 20px;
+    }
+
+    .auth-form {
+        width: 100%;
+        max-width: 400px;
+        background: #ffffff;
+        padding: 30px 25px;
+        border-radius: 12px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    .auth-form h2.form-title {
+        text-align: center;
+        margin-bottom: 25px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    /* Style the Django default fields */
+    .auth-form p {
+        margin-bottom: 15px;
+    }
+
+    .auth-form input {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1.8px solid #e5e7eb;
+        font-size: 15px;
+        outline: none;
+        transition: 0.2s;
+    }
+
+    .auth-form input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    .auth-form button {
+        margin-top: 10px;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 8px;
+    }
+
+    .auth-form .btn-outline-primary {
+        margin-top: 5px;
+    }
+
+    .auth-form p.text-center {
+        font-size: 14px;
+        color: #6b7280;
+        margin-top: 15px;
+    }
+</style>
 {% endblock %}

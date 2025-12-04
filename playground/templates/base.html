@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Family Sacco{% endblock %}</title>
+    <!-- MBootstrap Icons  -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" 
           rel="stylesheet" 
           integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" 
@@ -32,13 +35,14 @@
 </head>
 <body>
 
+
 <!-- Responsive Navbar -->
 <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
     <div class="container-fluid px-3 px-lg-4">
         
         <!-- Brand / Title -->
         <a class="navbar-brand fw-bold" href="{% url 'index' %}">
-            Sokohub
+            <i class="bi bi-shop"></i> Sokohub
         </a>
 
         <!-- Hamburger Toggle - Visible only on small screens -->
@@ -53,47 +57,66 @@
                 <!-- Public Links (visible when NOT logged in) -->
                 {% if not request.user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'index' %}">Home</a>
+                        <a class="nav-link" href="{% url 'index' %}">
+                            <i class="bi bi-house-door"></i> Home
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'signup' %}">Signup</a>
+                        <a class="nav-link" href="{% url 'signup' %}">
+                            <i class="bi bi-person-plus"></i> Signup
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link btn btn-outline-primary ms-lg-2 px-3" href="{% url 'login' %}">Login</a>
+                        <a class="nav-link btn btn-outline-primary ms-lg-2 px-3" href="{% url 'login' %}">
+                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        </a>
                     </li>
 
                 <!-- Authenticated User Menu -->
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'index' %}">Home</a>
+                        <a class="nav-link" href="{% url 'index' %}">
+                            <i class="bi bi-house-door"></i> Home
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'store' %}">Store</a>
+                        <a class="nav-link" href="{% url 'store' %}">
+                            <i class="bi bi-bag"></i> Store
+                        </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link position-relative" href="{% url 'cart' %}">
-                            Cart
+                            <i class="bi bi-cart"></i> Cart
                             <!-- Optional: add cart count badge -->
                             <!-- <span class="badge bg-primary ms-1">3</span> -->
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'messages' %}">Messages</a>
+                        <a class="nav-link" href="{% url 'messages' %}">
+                            <i class="bi bi-chat-dots"></i> Messages
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'account' %}">Account</a>
+                        <a class="nav-link" href="{% url 'account' %}">
+                            <i class="bi bi-person-circle"></i> Account
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-danger fw-semibold" href="{% url 'logout' %}">Logout</a>
+                        <a class="nav-link text-danger fw-semibold" href="{% url 'logout' %}">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
                     </li>
                 {% endif %}
             </ul>
         </div>
     </div>
 </nav>
+
+
+
     <!-- Main Content Area (grows to push footer down) -->
     <main class="container-fluid flex-grow-1">
-        <p>Welcome, {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Guest{% endif %}!</p>
+        <div>Welcome, {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Guest{% endif %}!</div>
         {% block content %}
         
         {% endblock %}
@@ -103,7 +126,7 @@
     <footer class="text-center text-white">
         <div class="container-fluid ">
             {% block footer %}
-            <p class="mb-0">© {% now "Y" %} Family Sacco. All rights reserved.</p>
+            <p class="mb-0">© {% now "Y" %} Sokohub. All rights reserved.</p>
             {% endblock %}
         </div>
     </footer>

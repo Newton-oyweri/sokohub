@@ -2,60 +2,114 @@
 
 {% block title %}Home - Family Sacco{% endblock %}
 
+
 {% block content %}
-<div class="p-4 bg-white shadow rounded">
-    <h2>Welcome to the Dashboard</h2>
-    <p>Your content goes here...</p>
-    <!-- Even if this is just one line, footer stays at bottom! -->
-</div>
-<div>hello from here</div>
-<div class="row g-4">
-<!-- Savings Account -->
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 hover-shadow transition">
-                <div class="card-body text-center p-4">
-                    <div class="bg-success text-white rounded-circle mx-auto mb-4 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                        <i class="bi bi-piggy-bank fs-1"></i>
-                    </div>
-                    <h4 class="card-title">Savings Account</h4>
-                    <p class="card-text text-muted">Grow your money safely with attractive interest rates. Regular savings build your future.</p>
-                
-                    <a href="{% url 'account' %}" class="btn btn-outline-success mt-3">Open Savings →</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 hover-shadow transition">
-                <div class="card-body text-center p-4">
-                    <div class="bg-warning text-dark rounded-circle mx-auto mb-4 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                        <i class="bi bi-cash-stack fs-1"></i>
-                    </div>
-                    <h4 class="card-title">Instant Loans</h4>
-                    <p class="card-text text-muted">Get quick loans up to 3x your savings at low interest rates. Emergency? School fees? We've got you.</p>
-                    <a href="#" class="btn btn-outline-warning mt-3">Apply for Loan →</a>
-                </div>
-            </div>
-        </div>
 
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0 hover-shadow transition">
-                <div class="card-body text-center p-4">
-                    <div class="bg-info text-white rounded-circle mx-auto mb-4 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                        <i class="bi bi-bar-chart-fill fs-1"></i>
-                    </div>
-                    <h4 class="card-title">Shares & Dividends</h4>
-                    <p class="card-text text-muted">Buy shares and earn annual dividends. The more you save, the more you own!</p>
-                    <a href="#" class="btn btn-outline-info mt-3">Buy Shares →</a>
-                </div>
-            </div>
-        </div>
-
-    </div>  
-
-    <div class="text-center my-5 py-5 bg-light rounded shadow">
-        <h2>Ready to Grow Your Wealth?</h2>
-        <p class="lead">Join over 5,000 happy members saving and growing together.</p>
-        <a href="{% url 'signup' %}" class="btn btn-success btn-lg">Become a Member Today</a>
+<div class="search-wrapper">
+    <div class="search-input-wrapper">
+        <i class="bi bi-search search-icon"></i>
+        <input 
+            type="text" 
+            class="search-input" 
+            placeholder="Search for something..."
+            oninput="showResults(this.value)"
+        >
     </div>
+
+    <div class="search-results" id="resultsBox">
+        <!-- Results will appear here -->
+    </div>
+</div>
+
+<!-- Include Bootstrap Icons if not already -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+    .search-wrapper {
+        width: 100%;
+        padding: 15px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 10px 40px 10px 14px; /* space for icon */
+        border: 1.8px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 15px;
+        outline: none;
+        transition: 0.2s;
+    }
+
+    .search-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    .search-icon {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
+        color: #9ca3af;
+        pointer-events: none; /* icon won't block input */
+    }
+
+    .search-results {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+    }
+
+    .search-item {
+        padding: 10px 16px;
+        background: #f3f4f6;
+        border-radius: 8px;
+        white-space: nowrap;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .search-item:hover {
+        background: #e5e7eb;
+    }
+</style>
+
+<script>
+    function showResults(text) {
+        const results = document.getElementById("resultsBox");
+
+        if (text.trim() === "") {
+            results.innerHTML = "";
+            return;
+        }
+
+        // Dummy results for demo
+        const sample = [
+            text + " result 1",
+            text + " result 2",
+            text + " result 3",
+            text + " result 4"
+        ];
+
+        results.innerHTML = sample
+            .map(item => `<div class="search-item">${item}</div>`)
+            .join("");
+    }
+</script>
+
 {% endblock %}
 
