@@ -5,24 +5,19 @@ from django.contrib.auth.decorators import login_required
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
-
-
-
+from django.contrib.auth.forms import AuthenticationForm
 
 def login_view(request):
     if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
-
-        user = authenticate(request, username=username, password=password)
-
-        if user is not None:
+        form = AuthenticationForm(request=request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
             login(request, user)
-            return redirect("index")   # redirect anywhere you want
-        else:
-            messages.error(request, "Invalid username or password")
+            return redirect("index")
+    else:
+        form = AuthenticationForm()
+    return render(request, "login.html", {"form": form})
 
-    return render(request, "login.html")
 
 
 def signup(request):

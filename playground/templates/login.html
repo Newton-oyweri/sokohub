@@ -1,30 +1,54 @@
-
 {% extends 'base.html' %}
 
-{% block title %}login page{% endblock %}
+{% block title %}Login{% endblock %}
+
 {% block content %}
-<h2>Login</h2>
+<div style="
+    max-width: 400px;
+    margin: 40px auto;
+    padding: 30px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+">
 
-<form method="POST">
-    {% csrf_token %}
-    
-    {% if messages %}
-        {% for message in messages %}
-            <p style="color:red;">{{ message }}</p>
-        {% endfor %}
-    {% endif %}
+    <h2 style="text-align:center; margin-bottom:20px;">Login</h2>
 
-    <p>
-        <label>Username</label><br>
-        <input type="text" name="username" required>
-    </p>
+    <form method="POST">
+        {% csrf_token %}
+        
+        <!-- Form-level errors like: "Please enter a correct username and password." -->
+        <div style="color:red; margin-bottom:10px;">
+            {{ form.non_field_errors }}
+        </div>
 
-    <p>
-        <label>Password</label><br>
-        <input type="password" name="password" required>
-    </p>
+        <p>
+            {{ form.username.label_tag }}
+            <br>
+            {{ form.username }}
+            <span style="color:red;">{{ form.username.errors }}</span>
+        </p>
 
-    <button type="submit">Login</button>
-</form>
+        <p>
+            {{ form.password.label_tag }}
+            <br>
+            {{ form.password }}
+            <span style="color:red;">{{ form.password.errors }}</span>
+        </p>
 
+        <button type="submit" style="
+            width:100%;
+            padding:10px;
+            background:#1e3a8a;
+            color:white;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+            font-size:16px;
+        ">
+            Login
+        </button>
+    </form>
+
+</div>
 {% endblock %}
