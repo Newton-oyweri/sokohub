@@ -2,7 +2,6 @@ from django.shortcuts import render , redirect
 from .models import Student
 from .forms import RegisterForm
 from django.contrib.auth.decorators import login_required
-
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
@@ -19,15 +18,18 @@ def login_view(request):
     return render(request, "login.html", {"form": form})
 
 
-
 def signup(request):
-    form = RegisterForm()
     if request.method == "POST":
         form = RegisterForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect("index")
+            user = form.save()     # save the user
+            login(request, user)   # auto-login immediately
+            return redirect("index")   # redirect to homepage
+    else:
+        form = RegisterForm()
+
     return render(request, "signup.html", {"form": form})
+
 
 
 
