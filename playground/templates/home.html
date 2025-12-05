@@ -114,5 +114,208 @@
 </script>
 
 
+<!-- Container -->
+<div class="container my-4">
+
+  <!-- Maize Category -->
+  <div class="category-title fs-4 fw-bold text-warning mb-3">Maize</div>
+  <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    
+    <div class="col">
+      <div class="card h-100">
+        <div class="card-img-top" style="background-image:url('https://images.unsplash.com/photo-1601863431726-4b3d4abfb182?auto=format&fit=crop&w=400&q=80'); height:180px; background-size:cover; background-position:center;"></div>
+        <div class="card-body">
+          <div class="card-title fw-bold">Yellow Maize</div>
+          <div class="card-text">1 bag - 50kg</div>
+          <div class="price text-danger fw-bold">KES 2,500</div>
+          <div class="d-grid mt-2">
+           <button class="btn btn-warning order-btn" 
+        data-product-id="{{ product.id }}" 
+        data-product-name="{{ product.name }}"
+        data-bs-toggle="modal" 
+        data-bs-target="#orderModal">
+    Order Now
+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card h-100">
+        <div class="card-img-top" style="background-image:url('https://images.unsplash.com/photo-1588087873875-9d5047fc0b19?auto=format&fit=crop&w=400&q=80'); height:180px; background-size:cover; background-position:center;"></div>
+        <div class="card-body">
+          <div class="card-title fw-bold">White Maize</div>
+          <div class="card-text">1 bag - 50kg</div>
+          <div class="price text-danger fw-bold">KES 2,700</div>
+          <div class="d-grid mt-2">
+            <button class="btn btn-warning order-btn" 
+        data-product-id="{{ product.id }}" 
+        data-product-name="{{ product.name }}"
+        data-bs-toggle="modal" 
+        data-bs-target="#orderModal">
+    Order Now
+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Beans Category -->
+  <div class="category-title fs-4 fw-bold text-warning mb-3">Beans</div>
+  <div class="row row-cols-1 row-cols-md-3 g-4">
+    
+    <div class="col">
+      <div class="card h-100">
+        <div class="card-img-top" style="background-image:url('https://images.unsplash.com/photo-1586201375761-83865001c96f?auto=format&fit=crop&w=400&q=80'); height:180px; background-size:cover; background-position:center;"></div>
+        <div class="card-body">
+          <div class="card-title fw-bold">Red Beans</div>
+          <div class="card-text">1 bag - 50kg</div>
+          <div class="price text-danger fw-bold">KES 3,200</div>
+          <div class="d-grid mt-2">
+            <button class="btn btn-warning">Order Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card h-100">
+        <div class="card-img-top" style="background-image:url('https://images.unsplash.com/photo-1617196037401-8b75ef39d61e?auto=format&fit=crop&w=400&q=80'); height:180px; background-size:cover; background-position:center;"></div>
+        <div class="card-body">
+          <div class="card-title fw-bold">White Beans</div>
+          <div class="card-text">1 bag - 50kg</div>
+          <div class="price text-danger fw-bold">KES 3,400</div>
+          <div class="d-grid mt-2">
+            <button class="btn btn-warning">Order Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  
+</div>
+<!-- Step-by-step Order Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      
+      <div class="modal-header">
+        <h5 class="modal-title" id="orderModalLabel">Place Your Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Step 1 -->
+        <div class="order-step" data-step="1">
+          <label>Quantity</label>
+          <input type="number" id="order-quantity" class="form-control" min="1" value="1">
+          <button class="btn btn-primary mt-3 next-step">Next</button>
+        </div>
+        
+        <!-- Step 2 -->
+        <div class="order-step d-none" data-step="2">
+          <label>Delivery Location</label>
+          <select id="order-location" class="form-select">
+            <option>Kisii</option>
+            <option>Nyamira</option>
+            <option>Kisumu</option>
+            <!-- add more -->
+          </select>
+          <button class="btn btn-secondary mt-3 prev-step">Back</button>
+          <button class="btn btn-primary mt-3 next-step">Next</button>
+        </div>
+        
+<!-- Step 3 - Confirmation -->
+<div class="order-step d-none" data-step="3">
+  <h6 class="fw-bold text-success">Review Your Order</h6>
+  <div class="bg-light p-3 rounded border">
+    <p class="mb-1"><strong>Product:</strong> <span id="confirm-product"></span></p>
+    <p class="mb-1"><strong>Quantity:</strong> <span id="confirm-quantity"></span></p>
+    <p class="mb-0"><strong>Delivery:</strong> <span id="confirm-location"></span></p>
+  </div>
+  <div class="mt-4 d-flex gap-2 justify-content-end">
+    <button class="btn btn-outline-secondary prev-step">Back</button>
+    <button class="btn btn-success px-4" id="submit-order">
+      Confirm & Submit Order
+    </button>
+  </div>
+</div>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  let currentStep = 1;
+  let selectedProductName = "";
+
+  const modal = new bootstrap.Modal(document.getElementById('orderModal'));
+
+  // Capture product name when any "Order Now" button is clicked
+  document.querySelectorAll(".order-btn").forEach(btn => {
+    btn.addEventListener("click", function () {
+      selectedProductName = this.closest('.card').querySelector('.card-title').textContent.trim();
+      document.getElementById("orderModalLabel").innerText = `Order: ${selectedProductName}`;
+      
+      // Reset form
+      document.getElementById("order-quantity").value = 1;
+      document.getElementById("order-location").selectedIndex = 0;
+      showStep(1);
+    });
+  });
+
+  const showStep = (step) => {
+    document.querySelectorAll(".order-step").forEach(s => s.classList.add("d-none"));
+    document.querySelector(`.order-step[data-step="${step}"]`).classList.remove("d-none");
+    currentStep = step;
+  };
+
+  // Next button
+  document.querySelectorAll(".next-step").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (currentStep === 1) {
+        const qty = document.getElementById("order-quantity").value;
+        if (!qty || qty < 1) {
+          alert("Please enter a valid quantity");
+          return;
+        }
+      }
+      if (currentStep === 2) {
+        document.getElementById("confirm-quantity").innerText = document.getElementById("order-quantity").value;
+        document.getElementById("confirm-location").innerText = document.getElementById("order-location").value;
+        document.getElementById("confirm-product").innerText = selectedProductName;
+      }
+      if (currentStep < 3) showStep(currentStep + 1);
+    });
+  });
+
+  // Back button
+  document.querySelectorAll(".prev-step").forEach(btn => {
+    btn.addEventListener("click", () => showStep(currentStep - 1));
+  });
+
+  // FINAL: Confirm & Submit → Just close modal with success message
+  document.getElementById("submit-order").addEventListener("click", () => {
+    const qty = document.getElementById("order-quantity").value;
+    const location = document.getElementById("order-location").value;
+
+    // Optional: You can log to console for now
+    console.log("Order Submitted:", { product: selectedProductName, qty, location });
+
+    // Show success alert
+    alert(`Order Confirmed!\n\n${qty} × ${selectedProductName}\nDelivery: ${location}\n\nWe'll contact you shortly!`);
+
+    // Close modal & reset
+    modal.hide();
+    showStep(1);
+  });
+});
+</script>
 {% endblock %}
 

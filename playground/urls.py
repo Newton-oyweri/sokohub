@@ -10,6 +10,8 @@ urlpatterns = [
       path("logout/", views.logout_view, name="logout"),
        path("cart/", views.cart, name="cart"),
          path("messages/", views.messages, name="messages"),
+  
+
    
 
 ]

@@ -6,6 +6,10 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
 # -----------------------------
 # LOGIN VIEW
 # -----------------------------
@@ -75,3 +79,28 @@ def account(request):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
+
+@login_required
+@csrf_exempt
+def place_order(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            product_id = data.get("product_id")
+            quantity = data.get("quantity")
+            location = data.get("location")
+            product_name = data.get("product_name", "Unknown Product")
+
+            if not all([product_id, quantity, location]):
+                return JsonResponse({"status": "error", "error": "Missing fields"}, status=400)
+
+            # TODO: Save to Order model here
+            print(f"Order: {quantity} x {product_name} -> {location} by {request.user}")
+
+            return JsonResponse({"status": "ok", "message": "Order placed successfully"})
+
+        except Exception as e:
+            return JsonResponse({"status": "error", "error": str(e)}, status=500)
+
+    return JsonResponse({"status": "error", "error": "Invalid method"}, status=405)
