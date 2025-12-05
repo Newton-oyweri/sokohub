@@ -115,7 +115,7 @@
 
 
 <!-- Container -->
-<div class="container my-4">
+<div class="container-fluid border my-4">
 
   <!-- Maize Category -->
   <div class="category-title fs-4 fw-bold text-warning mb-3">Maize</div>
@@ -175,8 +175,13 @@
           <div class="card-text">1 bag - 50kg</div>
           <div class="price text-danger fw-bold">KES 3,200</div>
           <div class="d-grid mt-2">
-            <button class="btn btn-warning">Order Now</button>
-          </div>
+                  <button class="btn btn-warning order-btn" 
+        data-product-id="{{ product.id }}" 
+        data-product-name="{{ product.name }}"
+        data-bs-toggle="modal" 
+        data-bs-target="#orderModal">
+    Order Now
+</button>  </div>
         </div>
       </div>
     </div>
@@ -189,8 +194,13 @@
           <div class="card-text">1 bag - 50kg</div>
           <div class="price text-danger fw-bold">KES 3,400</div>
           <div class="d-grid mt-2">
-            <button class="btn btn-warning">Order Now</button>
-          </div>
+                <button class="btn btn-warning order-btn" 
+        data-product-id="{{ product.id }}" 
+        data-product-name="{{ product.name }}"
+        data-bs-toggle="modal" 
+        data-bs-target="#orderModal">
+    Order Now
+</button>   </div>
         </div>
       </div>
     </div>
