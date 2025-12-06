@@ -110,7 +110,11 @@ MPESA_CONSUMER_KEY = 'Say0iOQ1xONhzk26jHfZYgmzTym4mNNOA2A46f7667kAs3g8'  # From 
 MPESA_CONSUMER_SECRET = '0NId9vQhLWechPnTYk6FFAwQAifTAwd1xadJw3vSVR2Jl9CZMS7cOkpfrb3pprMr'
 MPESA_SHORTCODE = '174379'  # Sandbox default (your paybill)
 MPESA_PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'  # From Daraja
-MPESA_CALLBACK_URL = 'https://neville-interconfessional-enedina.ngrok-free.dev/mpesa/callback/'
+
+MPESA_CALLBACK_URL = os.getenv(
+    "MPESA_CALLBACK_URL",                 
+    "https://sokohub-a8a0.onrender.com/mpesa/callback/"  
+)
 MPESA_STK_URL = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'  # Sandbox; prod: https://api.safaricom.co.ke/...
 MPESA_TOKEN_URL = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
 MPESA_MIN_AMOUNT = 10  # KES
