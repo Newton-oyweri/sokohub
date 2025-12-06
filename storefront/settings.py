@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-3)-2!8#k)6^7l%scm^kz2o4@)=!e-vfvw@=r9mpuex&bjqz!lg'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False # Set False for production
+DEBUG = True  # Set False for production
 
 ALLOWED_HOSTS = ['*']  # You can replace '*' with your Render URL like 'sokohub.onrender.com'
 
