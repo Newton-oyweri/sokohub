@@ -62,17 +62,6 @@ def cart(request):
 
 
 @login_required(login_url='login')
-def messages(request):
-    return render(request, 'messages.html')
-
-
-
-@login_required(login_url='login')
-def store(request):
-      return render(request, 'store.html')
-
-
-@login_required(login_url='login')
 def account(request):
     return render(request, 'account.html')
 

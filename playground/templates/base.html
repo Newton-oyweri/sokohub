@@ -11,6 +11,8 @@
 
     <!-- MBootstrap Icons  -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<!-- FontAwesome 6 (Free) -->
+<script src="https://kit.fontawesome.com/your-kit-id-here.js" crossorigin="anonymous"></script>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" 
           rel="stylesheet" 
@@ -39,87 +41,133 @@
     </style>
 </head>
 <body>
-<nav class="navbar navbar-light bg-white shadow-sm border-bottom sticky-top py-2">
-    <div class="container-fluid px-3 px-lg-4">
 
+  <nav class="navbar navbar-light shadow-sm border-bottom sticky-top py-2"
+     style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-bottom: 1px solid #334155 !important;">
+    <div class="container-fluid px-3 px-lg-4">
         <div class="d-flex align-items-center w-100">
 
-            <div class="d-flex align-items-center flex-shrink-0 me-3"> 
-                <a class="navbar-brand fw-bold d-flex align-items-center" href="{% url 'index' %}">
-                    <i class="bi bi-shop me-2 fs-5"></i>
-                    <span class="d-none d-sm-inline">Sokohub</span>
-                    <span class="d-sm-none fw-bold">Sokohub</span>
+            <div class="d-flex align-items-center flex-shrink-0 me-3">
+                <a class="navbar-brand fw-bold d-flex align-items-center text-white" href="{% url 'index' %}">
+                    <i class="bi bi-shop me-2 fs-5" style="color: #60a5fa;"></i>
+                    <span class="d-none d-sm-inline" style="background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Sokohub</span>
+                    <span class="d-sm-none fw-bold text-white">Sokohub</span>
                 </a>
-                <div class="vr ms-2 d-none d-sm-block"></div> 
+                <div class="vr ms-2 opacity-30 d-none d-sm-block" style="background-color: #475569;"></div>
             </div>
 
             <div class="d-flex align-items-center overflow-x-auto flex-nowrap flex-grow-1" 
-                style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+                 style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
                 
                 <div class="d-flex align-items-center gap-3 flex-nowrap">
                     {% if not request.user.is_authenticated %}
-                        <a class="nav-link px-3 py-2 rounded-3 text-primary" href="{% url 'index' %}">
+                        <a class="nav-link px-3 py-2 rounded-3 text-white fw-medium d-flex align-items-center gap-2" href="{% url 'index' %}">
                             <i class="bi bi-house-door"></i> Home
                         </a>
-                        <a class="nav-link px-3 py-2 rounded-3" href="{% url 'signup' %}">
+                        <a class="nav-link px-3 py-2 rounded-3 text-white fw-medium d-flex align-items-center gap-2" href="{% url 'signup' %}">
                             <i class="bi bi-person-plus"></i> Signup
                         </a>
-                        <a class="nav-link btn btn-outline-primary px-4 py-2 rounded-3" href="{% url 'login' %}">
+                        <a class="nav-link btn btn-outline-primary border-2 px-4 py-2 rounded-3 fw-semibold d-flex align-items-center gap-2" 
+                           href="{% url 'login' %}"
+                           style="border-color: #60a5fa !important; color: #60a5fa !important;">
                             <i class="bi bi-box-arrow-in-right"></i> Login
                         </a>
 
                     {% else %}
-                        <a class="nav-link px-3 py-2 rounded-3" href="{% url 'index' %}"><i class="bi bi-house-door"></i> Home</a>
-                        <a class="nav-link px-3 py-2 rounded-3" href="{% url 'store' %}"><i class="bi bi-bag"></i> Store</a>
-                        <a class="nav-link px-3 py-2 rounded-3 position-relative" href="{% url 'cart' %}">
-                            <i class="bi bi-cart"></i> Cart
+                        <a class="nav-link px-3 py-2 rounded-3 text-white fw-medium d-flex align-items-center gap-2 hover-lift" href="{% url 'index' %}">
+                            <i class="bi bi-house-door"></i> Home
                         </a>
-                        <a class="nav-link px-3 py-2 rounded-3" href="{% url 'messages' %}"><i class="bi bi-chat-dots"></i> Messages</a>
-                        <a class="nav-link px-3 py-2 rounded-3" href="{% url 'account' %}"><i class="bi bi-person-circle"></i> Account</a>
-                        <a class="nav-link px-3 py-2 rounded-3 text-danger fw-semibold" href="{% url 'logout' %}">
+            
+                        <a class="nav-link px-3 py-2 rounded-3 text-white fw-medium d-flex align-items-center gap-2 hover-lift position-relative" href="{% url 'cart' %}">
+                            <i class="bi bi-cart"></i> Cart
+                            <!-- Optional cart badge -->
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="cartCount" style="font-size:0.65rem; display:none;">0</span>
+                        </a>
+                  
+                        <a class="nav-link px-3 py-2 rounded-3 text-white fw-medium d-flex align-items-center gap-2 hover-lift" href="{% url 'account' %}">
+                            <i class="bi bi-person-circle"></i> Account
+                        </a>
+                        <a class="nav-link px-3 py-2 rounded-3 fw-semibold d-flex align-items-center gap-2 text-danger hover-logout" href="{% url 'logout' %}">
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </a>
                     {% endif %}
                 </div>
             </div>
-
         </div>
     </div>
 </nav>
 
-<!-- Clean & Minimal Styling -->
+<!-- PREMIUM COLOR & HOVER STYLING (only colors + effects, no layout changes) -->
 <style>
-    /* Hide scrollbar but keep smooth scrolling */
+    /* Scrollbar hidden */
     .overflow-x-auto::-webkit-scrollbar { display: none; }
     .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* Nav links - compact and touch-friendly */
+    /* Base nav link */
     .nav-link {
         white-space: nowrap;
         font-size: 0.95rem;
-        color: #333 !important;
-        transition: all 0.2s ease;
+        color: #e2e8f0 !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    /* Icon color */
+    .nav-link i { 
+        color: #94a3b8; 
+        transition: color 0.3s ease;
+    }
+
+    /* Main hover effect – lift + glow */
+    .hover-lift {
         border-radius: 12px !important;
+        overflow: hidden;
+    }
+    .hover-lift:hover {
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(167, 139, 250, 0.15));
+        color: white !important;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(96, 165, 250, 0.25);
+    }
+    .hover-lift:hover i {
+        color: #60a5fa;
     }
 
-    .nav-link:hover {
-        background-color: #f0f8ff;
-        color: #0066cc !important;
+    /* Login button special */
+    .btn-outline-primary {
+        transition: all 0.3s ease;
+    }
+    .btn-outline-primary:hover {
+        background: #60a5fa !important;
+        color: white !important;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4);
     }
 
-    .nav-link.btn {
-        font-size: 0.9rem;
-        font-weight: 600;
+    /* Logout special red hover */
+    .hover-logout:hover {
+        background: rgba(239, 68, 68, 0.2) !important;
+        color: #fca5a5 !important;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+    }
+    .hover-logout:hover i {
+        color: #fca5a5;
     }
 
-    /* On larger screens – normal spacing */
+    /* Active/Current page subtle indicator */
+    .nav-link:active,
+    .nav-link:focus {
+        background: rgba(96, 165, 250, 0.2);
+        color: white !important;
+    }
+
+    /* Responsive tweaks – only font/icon size */
     @media (min-width: 768px) {
         .gap-3 { gap: 1rem !important; }
-        .nav-link { font-size: 1rem; padding: 0.5rem 1rem !important; }
-        .navbar-brand { font-size: 1.5rem; }
+        .nav-link { font-size: 1rem; padding: 0.55rem 1.1rem !important; }
+        .navbar-brand { font-size: 1.6rem; }
     }
-
-    /* Extra small phones */
     @media (max-width: 360px) {
         .nav-link { padding: 0.5rem 0.8rem !important; font-size: 0.85rem; }
         .nav-link i { font-size: 1.1rem; }
@@ -130,9 +178,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
     <!-- Main Content Area (grows to push footer down) -->
-    <main class="container-fluid flex-grow-1">
-        <div>Welcome, {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Guest{% endif %}!</div>
-        {% block content %}
+    <main class="container-fluid flex-grow-1 my-0">
+    {% block content %}
         
         {% endblock %}
     </main>

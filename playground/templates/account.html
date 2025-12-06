@@ -4,26 +4,39 @@
 {% block title %}Account{% endblock %}
 
 {% block content %}
-<p>This is content for child 2</p>
+<div class="welcome-message w-100 text-center">
+    Welcome to your account dashboard, 
+    <span class="fw-bold text-primary">
+        {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Guest{% endif %}
+    </span>!
+</div>
 
+<style>
+.welcome-message {
+    width: 100%;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    color: #ffffff;
+    font-size: 1.3rem;
+    font-weight: 500;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+    transition: transform 0.3s, box-shadow 0.3s;
+    border-radius: 0; /* Remove rounded corners */
+    padding: 12px 0;   /* minimal vertical padding */
+    margin: 0;         /* remove margin */
+}
 
-<table class="table table-hover" style="   border: 2px solid black; " >
-    <thead>
-        <th style="   border: 2px solid black; ">name</th>
-        <th style="   border: 2px solid black; ">age</th>
-        <th  style="   border: 2px solid black; ">class</th>
-    </thead>
-    <tbody>
-        {% for student in students %}
-        <tr style="   border: 2px solid rgb(235, 57, 57); ">
-            <td style="   border: 2px solid black; " >{{ student.name }}</td>
-<td style="   border: 2px solid black; ">{{ student.age }}</td>
-<td  style="   border: 2px solid black; ">{{ student.course }}</td>
+.welcome-message:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.35);
+}
 
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+.welcome-message .text-primary {
+    color: #3b82f6 !important;
+    font-size: 1.4rem;
+}
+</style>
+
 
 {% endblock %}
 
