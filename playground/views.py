@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from .forms import RegisterForm
+from .forms import RegisterForm , UserEditForm, ProfileEditForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
@@ -8,6 +8,7 @@ from .models import Order
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
+
 
 # -----------------------------
 # LOGIN VIEW
@@ -55,15 +56,37 @@ def index(request):
 # -----------------------------
 # PROTECTED VIEWS
 # -----------------------------
+
 @login_required(login_url='login')
 def cart(request):
-    orders = Order.objects.all().order_by('-created_at')   # newest first
+    # Only fetch orders for the current user
+    orders = Order.objects.filter(user=request.user).order_by('-created_at')
     return render(request, 'cart.html', {'orders': orders})
+
 
 
 @login_required(login_url='login')
 def account(request):
-    return render(request, 'account.html')
+    user = request.user
+    profile = request.user.profile
+
+    if request.method == "POST":
+        user_form = UserEditForm(request.POST, instance=user)
+        profile_form = ProfileEditForm(request.POST, instance=profile)
+
+        if user_form.is_valid() and profile_form.is_valid():
+            user_form.save()
+            profile_form.save()
+            return redirect("account")  # refresh page
+    else:
+        user_form = UserEditForm(instance=user)
+        profile_form = ProfileEditForm(instance=profile)
+
+    return render(request, "account.html", {
+        "user_form": user_form,
+        "profile_form": profile_form,
+    })
+
 
 # -----------------------------
 # LOGOUT VIEW

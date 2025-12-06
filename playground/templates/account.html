@@ -1,43 +1,119 @@
-
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Account{% endblock %}
 
 {% block content %}
-<div class="welcome-message w-100 text-center">
-    Welcome to your account dashboard, 
-    <span class="fw-bold text-primary">
-        {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Guest{% endif %}
-    </span>!
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-10 col-md-12"> 
+            
+            <h2 class="mb-4">My Account</h2>
+        
+            <div id="view-section" class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Account Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 border-end">
+                            <h6 class="text-secondary mb-3">User Information</h6>
+                            <p class="mb-2"><strong>Username:</strong> {{ request.user.username }}</p>
+                            <p class="mb-2"><strong>Email:</strong> {{ request.user.email }}</p>
+                            <p class="mb-2"><strong>First Name:</strong> {{ request.user.first_name }}</p>
+                            <p class="mb-4"><strong>Last Name:</strong> {{ request.user.last_name }}</p>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6 class="text-secondary mb-3">Profile Information</h6>
+                            <p class="mb-2"><strong>Phone:</strong> {{ request.user.profile.phone }}</p>
+                            <p class="mb-2"><strong>County:</strong> {{ request.user.profile.county }}</p>
+                            <p class="mb-2"><strong>ID Number:</strong> {{ request.user.profile.id_number }}</p>
+                            <p class="mb-4"><strong>Gender:</strong> {{ request.user.profile.gender }}</p>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary mt-3" id="edit-btn">Edit Details</button>
+                </div>
+            </div>
+
+            <div id="edit-section" class="card shadow border-0" style="display:none;">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Edit Account Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <h6 class="text-secondary mb-3">User Details</h6>
+                            {% for field in user_form %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div>
+                            <h6 class="text-secondary mb-3">Profile Details</h6>
+                            {% for field in profile_form %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mt-4 d-flex justify-content-end">
+                            <button class="btn btn-success me-2" type="submit">Save Changes</button>
+                            <button class="btn btn-secondary" type="button" id="cancel-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<style>
-.welcome-message {
-    width: 100%;
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-    color: #ffffff;
-    font-size: 1.3rem;
-    font-weight: 500;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
-    transition: transform 0.3s, box-shadow 0.3s;
-    border-radius: 0; /* Remove rounded corners */
-    padding: 12px 0;   /* minimal vertical padding */
-    margin: 0;         /* remove margin */
-}
+<script>
+    document.addEventListener('DOMContentLoaded', (event) => {
+        const editBtn = document.getElementById("edit-btn");
+        const cancelBtn = document.getElementById("cancel-btn");
+        const viewSection = document.getElementById("view-section");
+        const editSection = document.getElementById("edit-section");
 
-.welcome-message:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.35);
-}
+        // Helper to add Bootstrap class 'form-control' to all form inputs
+        const inputs = editSection.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            const type = input.getAttribute('type');
+            if (input.tagName !== 'BUTTON' && type !== 'submit' && type !== 'hidden' && type !== 'checkbox' && type !== 'radio') {
+                input.classList.add('form-control');
+            }
+        });
 
-.welcome-message .text-primary {
-    color: #3b82f6 !important;
-    font-size: 1.4rem;
-}
-</style>
+        // Toggle visibility to edit form
+        if (editBtn) {
+            editBtn.addEventListener("click", () => {
+                viewSection.style.display = "none";
+                editSection.style.display = "block";
+            });
+        }
 
+        // Toggle visibility back to view
+        if (cancelBtn) {
+            cancelBtn.addEventListener("click", () => {
+                editSection.style.display = "none";
+                viewSection.style.display = "block";
+            });
+        }
+    });
+</script>
 
 {% endblock %}
-
-
