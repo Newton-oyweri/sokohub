@@ -260,6 +260,7 @@
   </div>
 </div>
 
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   let currentStep = 1;
@@ -327,5 +328,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 </script>
+
+
+{% load static %}
+<script src="{% static 'playground/js/modalscript.js' %}"></script>
+
 {% endblock %}
 

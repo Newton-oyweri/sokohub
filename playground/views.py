@@ -1,11 +1,10 @@
 from django.shortcuts import render, redirect
-from .models import Student
 from .forms import RegisterForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
-
+from .models import Order
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -58,20 +57,24 @@ def index(request):
 # -----------------------------
 @login_required(login_url='login')
 def cart(request):
-    return render(request, 'cart.html')
+    orders = Order.objects.all().order_by('-created_at')   # newest first
+    return render(request, 'cart.html', {'orders': orders})
+
 
 @login_required(login_url='login')
 def messages(request):
     return render(request, 'messages.html')
 
+
+
 @login_required(login_url='login')
 def store(request):
-    return render(request, 'store.html')
+      return render(request, 'store.html')
+
 
 @login_required(login_url='login')
 def account(request):
-    students = Student.objects.all()
-    return render(request, 'account.html', {'students': students})
+    return render(request, 'account.html')
 
 # -----------------------------
 # LOGOUT VIEW
@@ -80,23 +83,26 @@ def logout_view(request):
     logout(request)
     return redirect('login')
 
-
-@login_required
+@login_required(login_url='login')
 @csrf_exempt
 def place_order(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            product_id = data.get("product_id")
+            product_name = data.get("product_name")
             quantity = data.get("quantity")
             location = data.get("location")
-            product_name = data.get("product_name", "Unknown Product")
 
-            if not all([product_id, quantity, location]):
+            if not all([product_name, quantity, location]):
                 return JsonResponse({"status": "error", "error": "Missing fields"}, status=400)
 
-            # TODO: Save to Order model here
-            print(f"Order: {quantity} x {product_name} -> {location} by {request.user}")
+            # SAVE ORDER
+            Order.objects.create(
+                user=request.user,
+                product=product_name,
+                quantity=quantity,
+                delivery_location=location
+            )
 
             return JsonResponse({"status": "ok", "message": "Order placed successfully"})
 
