@@ -26,6 +26,7 @@
                         
                         <div class="col-md-6">
                             <h6 class="text-secondary mb-3">Profile Information</h6>
+                              <p class="mb-2"><strong>Balance:</strong> {{ request.user.profile.balance }}</p>
                             <p class="mb-2"><strong>Phone:</strong> {{ request.user.profile.phone }}</p>
                             <p class="mb-2"><strong>County:</strong> {{ request.user.profile.county }}</p>
                             <p class="mb-2"><strong>ID Number:</strong> {{ request.user.profile.id_number }}</p>
@@ -82,38 +83,44 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', (event) => {
-        const editBtn = document.getElementById("edit-btn");
-        const cancelBtn = document.getElementById("cancel-btn");
-        const viewSection = document.getElementById("view-section");
-        const editSection = document.getElementById("edit-section");
+<form method="POST" 
+      action="{% url 'mpesa_payment' %}" 
+      class="p-3 shadow-sm border rounded bg-white" 
+      style="max-width: 400px;">
+      
+    {% csrf_token %}
 
-        // Helper to add Bootstrap class 'form-control' to all form inputs
-        const inputs = editSection.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            const type = input.getAttribute('type');
-            if (input.tagName !== 'BUTTON' && type !== 'submit' && type !== 'hidden' && type !== 'checkbox' && type !== 'radio') {
-                input.classList.add('form-control');
-            }
-        });
+    <!-- Phone pre-filled & readonly -->
+    <div class="mb-3">
+        <label for="phone" class="form-label">Phone Number</label>
+        <input type="text" 
+               id="phone" 
+               name="phone" 
+               class="form-control" 
+               value="{{ request.user.profile.phone }}" 
+               readonly>
+        <div class="form-text">Payments will be requested on this number</div>
+    </div>
 
-        // Toggle visibility to edit form
-        if (editBtn) {
-            editBtn.addEventListener("click", () => {
-                viewSection.style.display = "none";
-                editSection.style.display = "block";
-            });
-        }
+    <!-- Amount -->
+    <div class="mb-3">
+        <label for="amount" class="form-label">Amount to deposit (KES)</label>
+        <input type="number" 
+               id="amount" 
+               name="amount" 
+               class="form-control" 
+               placeholder="Enter amount…" 
+               min="10" 
+               required>
+    </div>
 
-        // Toggle visibility back to view
-        if (cancelBtn) {
-            cancelBtn.addEventListener("click", () => {
-                editSection.style.display = "none";
-                viewSection.style.display = "block";
-            });
-        }
-    });
-</script>
+    <!-- YOUR BUTTON IS PERFECT — KEEP IT EXACTLY LIKE THIS -->
+    <button type="submit" class="btn btn-success w-100">
+        Pay with M-Pesa
+    </button>
+</form>
+
+
+<script src="{% static 'playground/js/accountswitchform.js' %}"></script>
 
 {% endblock %}

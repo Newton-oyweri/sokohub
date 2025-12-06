@@ -1,13 +1,39 @@
+# ========================
+# Standard library imports
+# ========================
+import json
+import logging
+from datetime import datetime
+from decimal import Decimal
+
+# ========================
+# Third-party imports
+# ========================
+import requests
+
+# ========================
+# Django imports
+# ========================
 from django.shortcuts import render, redirect
-from .forms import RegisterForm , UserEditForm, ProfileEditForm
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
-from .models import Order
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import json
+from django.views.decorators.http import require_http_methods
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.conf import settings
+from django.views.decorators.http import require_POST
+
+# ========================
+# Local app imports
+# ========================
+from .forms import RegisterForm, UserEditForm, ProfileEditForm, MpesaPaymentForm
+from .models import Order, MpesaCheckout, Profile
+from .utils import get_access_token, generate_password, normalize_phone, timestamp
+
 
 
 # -----------------------------
@@ -122,3 +148,170 @@ def place_order(request):
             return JsonResponse({"status": "error", "error": str(e)}, status=500)
 
     return JsonResponse({"status": "error", "error": "Invalid method"}, status=405)
+
+logger = logging.getLogger(__name__)
+
+@login_required
+def mpesa_payment(request):
+    if request.method == 'POST':
+        phone = request.POST.get('phone', '').strip()
+        raw_amount = request.POST.get('amount', '')
+        
+
+        # === 1. Validate input ===
+        try:
+            phone = normalize_phone(phone)
+            amount = int(float(raw_amount))
+            if amount < 1:  # Sandbox allows 1 KES
+                raise ValueError("Minimum amount is 1 KES in sandbox")
+        except ValueError as e:
+            messages.error(request, f"Invalid input: {e}")
+            return redirect('account')
+
+        # === 2. Create PENDING checkout (this will now stay visible) ===
+        checkout = MpesaCheckout.objects.create(
+            user=request.user,
+            phone=phone,
+            amount=amount,
+            status='PENDING',
+            checkout_id=f"sokohub_{request.user.id}_{int(datetime.now().timestamp())}"
+        )
+
+        # === 3. Build payload ===
+        payload = {
+            "BusinessShortCode": settings.MPESA_SHORTCODE,
+            "Password": generate_password(),
+            "Timestamp": timestamp(),
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": amount,
+            "PartyA": phone,
+            "PartyB": settings.MPESA_SHORTCODE,
+            "PhoneNumber": phone,
+            "CallBackURL": settings.MPESA_CALLBACK_URL,
+            "AccountReference": f"Deposit_{checkout.id}",
+            "TransactionDesc": "Sokohub Wallet Deposit"
+        }
+
+        headers = {
+            "Authorization": f"Bearer {get_access_token()}",
+            "Content-Type": "application/json"
+        }
+
+        # === 4. Send STK Push + FULL DEBUG LOGGING ===
+        try:
+            response = requests.post(settings.MPESA_STK_URL, json=payload, headers=headers, timeout=30)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Network error: {e}"
+            checkout.status = 'FAILED'
+            checkout.save()
+            messages.error(request, "Could not reach Safaricom. Check internet/connection.")
+            logger.error(f"STK Push network error: {e}")
+            return redirect('account')
+
+        # === 5. Parse response (this is where most people fail) ===
+        try:
+            res_data = response.json()
+        except ValueError:
+            res_data = {"raw": response.text}
+
+        # Log everything — this is GOLD for debugging
+        logger.info(f"STK PUSH SENT → Amount: {amount} | Phone: {phone}")
+        logger.info(f"Payload: {payload}")
+        logger.info(f"Response ({response.status_code}): {res_data}")
+
+        # === 6. Success or detailed failure ===
+        if response.status_code == 200 and str(res_data.get("ResponseCode")) == "0":
+            # SUCCESS → Save Safaricom IDs (critical for callback!)
+            checkout.merchant_request_id = res_data.get("MerchantRequestID")
+            checkout.checkout_request_id = res_data.get("CheckoutRequestID")
+            checkout.save()
+
+            messages.success(request, "STK Push sent! Check your phone and enter PIN.")
+            logger.info(f"SUCCESS → CheckoutRequestID: {checkout.checkout_request_id}")
+
+        else:
+            # FAILURE → Keep PENDING? No — mark FAILED but show real error
+            error_code = res_data.get("errorCode", "Unknown")
+            error_msg = res_data.get("errorMessage", res_data.get("requestId", "Unknown error"))
+            full_error = f"STK Failed [{error_code}]: {error_msg}"
+
+            checkout.status = 'FAILED'
+            checkout.save()
+
+            messages.error(request, f"Payment failed: {full_error}")
+            logger.error(f"STK PUSH FAILED → {full_error}")
+
+        return redirect('account')
+
+    # GET request → show form
+    return render(request, 'account.html')
+
+
+
+
+logger = logging.getLogger(__name__)
+
+@csrf_exempt
+@require_POST
+def mpesa_callback(request):
+    try:
+        data = json.loads(request.body)
+        logger.info(f"CALLBACK RECEIVED: {data}")
+
+        body = data.get("Body", {})
+        stk_callback = body.get("stkCallback", {})
+        
+        checkout_request_id = stk_callback.get("CheckoutRequestID")
+        result_code = stk_callback.get("ResultCode")
+        result_desc = stk_callback.get("ResultDesc", "")
+
+        if not checkout_request_id:
+            logger.error("No CheckoutRequestID in callback")
+            return JsonResponse({"ResultCode": 1, "ResultDesc": "Invalid callback"})
+
+        # Find the transaction using CheckoutRequestID (this is the correct one!)
+        try:
+            checkout = MpesaCheckout.objects.get(checkout_request_id=checkout_request_id)
+        except MpesaCheckout.DoesNotExist:
+            logger.error(f"CheckoutRequestID {checkout_request_id} not found")
+            return JsonResponse({"ResultCode": 1, "ResultDesc": "Transaction not found"})
+
+        if result_code == 0:  # SUCCESS
+            metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
+            amount = None
+            receipt = None
+            
+            for item in metadata:
+                if item["Name"] == "Amount":
+                    amount = Decimal(str(item["Value"]))
+                elif item["Name"] == "MpesaReceiptNumber":
+                    receipt = item["Value"]
+
+            if amount and receipt:
+                # Credit user balance
+                profile = checkout.user.profile
+                profile.balance += amount
+                profile.save()
+
+                # Update checkout
+                checkout.status = 'SUCCESS'
+                checkout.transaction_id = receipt
+                checkout.save()
+
+                logger.info(f"PAYMENT SUCCESS: {receipt} | +{amount} KES to {checkout.user}")
+            else:
+                checkout.status = 'FAILED'
+                checkout.save()
+
+        else:
+            # Failed / Cancelled / Timeout
+            checkout.status = 'FAILED'
+            checkout.save()
+            logger.warning(f"Payment failed: {result_desc}")
+
+        return JsonResponse({"ResultCode": 0, "ResultDesc": "Accepted"})
+
+    except Exception as e:
+        logger.error(f"Callback error: {str(e)}")
+        return JsonResponse({"ResultCode": 1, "ResultDesc": "Error"})

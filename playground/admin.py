@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Profile, Order
+from .models import Profile, Order, MpesaCheckout
 
-admin.site.register(Profile)
-admin.site.register(Order)
+# Register models safely
+for model in [Profile, MpesaCheckout, Order]:
+    try:
+        admin.site.register(model)
+    except admin.sites.AlreadyRegistered:
+        pass

@@ -3,6 +3,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from .models import Profile
+from django.conf import settings 
 
 class UserEditForm(forms.ModelForm):
     class Meta:
@@ -57,3 +58,12 @@ class RegisterForm(UserCreationForm):
             )
 
         return user
+
+
+
+
+class MpesaPaymentForm(forms.Form):
+    phone = forms.CharField(widget=forms.TextInput(attrs={'readonly': True}))
+    amount = forms.IntegerField(min_value=settings.MPESA_MIN_AMOUNT, label='Amount to deposit (KES)')
+
+
