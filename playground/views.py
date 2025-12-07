@@ -207,7 +207,7 @@ def mpesa_payment(request):
             "PartyB": settings.MPESA_SHORTCODE,
             "PhoneNumber": phone,
             "CallBackURL": settings.MPESA_CALLBACK_URL,
-            "AccountReference": f"Deposit_{checkout.id}",
+            "AccountReference": "Sokohub",
             "TransactionDesc": "Sokohub Wallet Deposit"
         }
 
