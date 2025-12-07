@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Market Trends{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <b>Market Trends</b>
+
+    <!-- Dropdown to select product -->
+    <div class="dropdown mb-3">
+      <button class="btn btn-primary dropdown-toggle" type="button" id="marketDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        product
+      </button>
+      <ul class="dropdown-menu" aria-labelledby="marketDropdown"><li>
+  <a class="dropdown-item" href="#" onclick="updateChart('Maize')">
+    Maize <span style="color:green;">↑</span>
+  </a>
+</li>
+<li>
+  <a class="dropdown-item" href="#" onclick="updateChart('Beans')">
+    Beans <span style="color:red;">↓</span>
+  </a>
+</li>
+  <li>
+    <a class="dropdown-item" href="#" onclick="updateChart('Sugar')" style="display: flex; align-items: center; text-decoration: none;">
+      Sugar <span style="margin-left: 5px; color: #777;">→</span>
+    </a>
+  </li>
+<li>
+  <a class="dropdown-item" href="#" onclick="updateChart('Wheat')">
+    Wheat <span style="color:red;">↓</span>
+  </a>
+</li>
+
+      </ul>
+    </div>
+
+    <!-- Chart container -->
+    <canvas id="marketChart" width="400" height="200"></canvas>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Helper: get day suffix
+    function getDaySuffix(day) {
+        if (day > 3 && day < 21) return 'th';
+        switch (day % 10) {
+            case 1: return 'st';
+            case 2: return 'nd';
+            case 3: return 'rd';
+            default: return 'th';
+        }
+    }
+
+    // Generate last 7 days in "7th Dec" format
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const labels = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(today.getDate() - i);
+        const day = d.getDate();
+        const month = monthNames[d.getMonth()];
+        labels.push(day + getDaySuffix(day) + ' ' + month);
+    }
+
+    // Sample realistic data for products
+    const sampleData = {
+        'Maize': Array.from({length: 7}, () => Math.floor(Math.random() * 50) + 100),
+        'Beans': Array.from({length: 7}, () => Math.floor(Math.random() * 40) + 80),
+        'Sugar': Array.from({length: 7}, () => Math.floor(Math.random() * 30) + 60),
+        'Wheat': Array.from({length: 7}, () => Math.floor(Math.random() * 25) + 50)
+    };
+
+    const ctx = document.getElementById('marketChart').getContext('2d');
+    let marketChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Maize Prices',
+                data: sampleData['Maize'],
+                borderColor: 'orange',
+                backgroundColor: 'rgba(255,165,0,0.2)',
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true }
+            },
+            scales: {
+                y: { beginAtZero: false }
+            }
+        }
+    });
+
+    // Update chart when selecting a product
+    function updateChart(product) {
+        marketChart.data.datasets[0].data = sampleData[product];
+        marketChart.data.datasets[0].label = product + ' Prices';
+        marketChart.update();
+    }
+</script>
+{% endblock %}

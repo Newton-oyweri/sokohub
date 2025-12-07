@@ -79,6 +79,9 @@ def signup(request):
 def index(request):
     return render(request, 'home.html')
 
+def market(request):
+    return render(request, 'market.html')
+
 # -----------------------------
 # PROTECTED VIEWS
 # -----------------------------
