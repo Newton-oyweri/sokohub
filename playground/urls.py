@@ -12,5 +12,7 @@ urlpatterns = [
          path("place-order/", views.place_order, name="place_order"),
         path('deposit/', views.mpesa_payment, name='mpesa_payment'),
      path('mpesa/callback/', views.mpesa_callback, name='mpesa_callback'),
+         path('delete-order/<int:order_id>/', views.delete_order, name='delete_order'),
+             path('delete-account/', views.delete_account, name='delete_account'),
 
 ]

@@ -14,7 +14,7 @@ import requests
 # ========================
 # Django imports
 # ========================
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect , get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -36,6 +36,22 @@ from .utils import get_access_token, generate_password, normalize_phone, timesta
 
 
 
+
+def delete_order(request, order_id):
+    if request.method == "POST":
+        order = get_object_or_404(Order, id=order_id)
+        order.delete()
+    return redirect('cart')  # redirect back to the cart page
+
+@login_required
+def delete_account(request):
+    if request.method == "POST":
+        user = request.user
+        user.delete()  # This deletes the user and cascades to related models if set
+        messages.success(request, "Your account has been deleted successfully.")
+        return redirect('index')  # Redirect to homepage or goodbye page
+    else:
+        return redirect('account') 
 # -----------------------------
 # LOGIN VIEW
 # -----------------------------
