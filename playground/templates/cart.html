@@ -17,7 +17,7 @@
                 <p class="card-text text-muted"><small>Ordered on: {{ order.created_at }}</small></p>
             </div>
           <div class="card-footer bg-white border-top-0 d-flex gap-2">
-    <button class="btn btn-sm btn-primary flex-grow-1">Track Order</button>
+    <button class="btn btn-sm btn-primary flex-grow-1">Your order was successful</button>
     <form method="POST" action="{% url 'delete_order' order.id %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-sm btn-danger">Delete order</button>
