@@ -97,6 +97,14 @@
                             <i class="bi bi-person-circle"></i> Account
                         </a>
 
+            {% if request.user.profile.is_trader %}
+    <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if 'trader' in request.path %}active-link{% endif %}"
+       href="{% url 'trader' %}">
+        <i class="bi bi-briefcase"></i> Trader
+    </a>
+{% endif %}
+
+
                         <a class="nav-link px-3 py-2 rounded-3 fw-semibold d-flex align-items-center gap-2 text-danger hover-logout"
                            href="{% url 'logout' %}">
                             <i class="bi bi-box-arrow-right"></i> Logout

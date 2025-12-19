@@ -2,7 +2,7 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Profile
+from .models import Profile , Product
 from django.conf import settings 
 
 class UserEditForm(forms.ModelForm):
@@ -16,7 +16,18 @@ class ProfileEditForm(forms.ModelForm):
         model = Profile
         fields = ["phone", "county", "id_number", "gender"]
 
-
+class ProductForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = [
+            'name',
+            'description',
+            'category',
+            'price_per_unit',
+            'unit',
+            'stock',
+            'image',
+        ]
 class RegisterForm(UserCreationForm):
     # Extra user model fields
     first_name = forms.CharField(max_length=30, required=True)

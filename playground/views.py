@@ -26,12 +26,15 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.conf import settings
 from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.shortcuts import redirect, render
+
 
 # ========================
 # Local app imports
 # ========================
-from .forms import RegisterForm, UserEditForm, ProfileEditForm, MpesaPaymentForm
-from .models import Order, MpesaCheckout, Profile
+from .forms import RegisterForm, UserEditForm, ProfileEditForm, MpesaPaymentForm , ProductForm
+from .models import Order, MpesaCheckout, Profile , Product
 from .utils import get_access_token, generate_password, normalize_phone, timestamp
 
 
@@ -92,11 +95,71 @@ def signup(request):
 # -----------------------------
 # HOME PAGE
 # -----------------------------
+
 def index(request):
-    return render(request, 'home.html')
+    # Fetch all active products, newest first
+    products = Product.objects.filter(is_active=True).order_by('-created_at')
+    
+    # Get unique categories
+    categories = Product.objects.values_list('category', flat=True).distinct()
+    
+    context = {
+        'products': products,
+        'categories': categories,
+    }
+    
+    return render(request, 'home.html', context)
 
 def market(request):
     return render(request, 'market.html')
+
+
+
+def is_approved_trader(user):
+    return hasattr(user, 'profile') and user.profile.is_trader
+
+
+@login_required
+def trader(request):
+    # Only approved traders can access
+    if not hasattr(request.user, 'profile') or not request.user.profile.is_trader:
+        messages.error(request, "You must be an approved trader to add products.")
+        return redirect('account')
+
+    if request.method == 'POST':
+        form = ProductForm(request.POST, request.FILES)
+        if form.is_valid():
+            product = form.save(commit=False)
+            product.trader = request.user
+            product.save()
+            
+            messages.success(request, f'"{product.name}" has been added successfully!')
+            
+            # Redirect to home/shop page to see the new product
+            return redirect('index')  # <-- Change this to your homepage URL name
+    else:
+        form = ProductForm()
+
+    # My products list (still show on trader page)
+    products = Product.objects.filter(trader=request.user).order_by('-created_at')
+    
+    return render(request, 'trader.html', {
+        'form': form,
+        'products': products
+    })
+
+@login_required
+def request_trader_status(request):
+    profile = request.user.profile
+    if profile.trader_request_sent:
+        messages.info(request, "You have already requested to become a trader.")
+    elif profile.is_trader:
+        messages.info(request, "You are already an approved trader!")
+    else:
+        profile.trader_request_sent = True
+        profile.save()
+        messages.success(request, "Your request to become a trader has been sent! We'll review it soon.")
+    return redirect('account')  # or whatever your account page URL name is
 
 # -----------------------------
 # PROTECTED VIEWS

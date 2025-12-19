@@ -114,7 +114,6 @@
                required>
     </div>
 
-    <!-- YOUR BUTTON IS PERFECT — KEEP IT EXACTLY LIKE THIS -->
     <button type="submit" class="btn btn-success w-100">
         Pay with M-Pesa
     </button>
@@ -128,7 +127,44 @@
         </button>
     </form>
 
+<!-- Trader Status Section -->
+<div class="card shadow-sm border-0 mt-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">Trader Status</h5>
+    </div>
+    <div class="card-body text-center py-4">
 
+        {% if request.user.profile.is_trader %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                <strong>Congratulations!</strong> You are an approved trader.
+            </div>
+            <a href="{% url 'trader' %}" class="btn btn-success btn-lg">
+                Go to Trader Dashboard
+            </a>
+
+        {% elif request.user.profile.trader_request_sent %}
+            <div class="alert alert-warning">
+                <i class="fas fa-clock"></i>
+                Your trader request is <strong>pending approval</strong>.<br>
+                We'll notify you once it's reviewed.
+            </div>
+
+        {% else %}
+            <p class="mb-4">Want to sell products on the platform?</p>
+            <form method="POST" action="{% url 'request_trader' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-lg">
+                    Request to Become a Trader
+                </button>
+            </form>
+            <small class="text-muted d-block mt-3">
+                Your account will be reviewed by our team. Approval usually takes 1-3 business days.
+            </small>
+        {% endif %}
+
+    </div>
+</div>
 
 <script src="{% static 'playground/js/accountswitchform.js' %}"></script>
 
