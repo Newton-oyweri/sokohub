@@ -121,22 +121,36 @@ MPESA_TOKEN_URL = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=
 MPESA_MIN_AMOUNT = 10  # KES
 
 
+import os
+
 PWA_APP_NAME = 'SokoHub'
-PWA_APP_DESCRIPTION = "Your marketplace for buying and selling"
-PWA_APP_THEME_COLOR = '#0a5d3d'  # Pick a color from your site
+PWA_APP_DESCRIPTION = "Your marketplace for buying and selling locally"
+PWA_APP_THEME_COLOR = '#0f172a'  # Dark slate from your navbar – looks premium
 PWA_APP_BACKGROUND_COLOR = '#ffffff'
-PWA_APP_DISPLAY = 'standalone'
+PWA_APP_DISPLAY = 'standalone'  # Full-screen app mode (no browser UI)
 PWA_APP_SCOPE = '/'
 PWA_APP_ORIENTATION = 'any'
 PWA_APP_START_URL = '/'
 PWA_APP_STATUS_BAR_COLOR = 'default'
-PWA_APP_ICONS = [
-    {'src': '/static/images/icon-192.png', 'sizes': '192x192'},
-    {'src': '/static/images/icon-512.png', 'sizes': '512x512'}
-]
-PWA_APP_SPLASH_SCREEN = [
-    {'src': '/static/images/splash-screen.png', 'media': '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)'}
-]
-PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'static/js/service-worker.js')
 PWA_APP_DIR = 'ltr'
 PWA_APP_LANG = 'en-US'
+
+# Using your existing icon.png and icon2.png
+# Assuming icon.png is smaller, icon2.png is larger – we'll use both
+PWA_APP_ICONS = [
+    {
+        'src': '/static/playground/images/icon.png',
+        'sizes': '192x192',
+        'type': 'image/png'
+    },
+    {
+        'src': '/static/playground/images/icon2.png',
+        'sizes': '512x512',
+        'type': 'image/png'
+    }
+]
+
+# Optional: Add more if you resize later
+# For now, skip splash screens (they need many sizes – we can add later)
+# Remove or comment out PWA_APP_SPLASH_SCREEN and PWA_SERVICE_WORKER_PATH if causing issues
+# django-pwa handles a basic service worker automatically
