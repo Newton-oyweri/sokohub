@@ -8,4 +8,4 @@ sqlparse==0.5.3
 urllib3==2.6.0
 whitenoise==6.11.0
 gunicorn==23.0.0
-Pillow>=11.0.0
+Pillow>=11.0.0django-pwa==2.0.1
