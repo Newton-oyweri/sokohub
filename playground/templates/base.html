@@ -5,40 +5,110 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1024, initial-scale=1">
+    <meta name="viewport" content="width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}Sokohub{% endblock %}</title>
     <link rel="icon" href="{% static 'playground/images/favicon.png' %}" type="image/png">
 
-   
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://kit.fontawesome.com/your-kit-id-here.js" crossorigin="anonymous"></script>
 
-    <!-- MBootstrap Icons  -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-<!-- FontAwesome 6 (Free) -->
-<script src="https://kit.fontawesome.com/your-kit-id-here.js" crossorigin="anonymous"></script>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" 
-          rel="stylesheet" 
-          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" 
-          crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     
-    <!-- Essential CSS for sticky footer -->
     <style>
+        /* GLOBAL ZOOM PREVENTION */
         html {
             height: 100%;
+            touch-action: manipulation; /* Prevents double-tap zoom */
         }
         body {
             min-height: 100%;
             width: 100%;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
+
+        /* MANDATORY 16px FIX: 
+           This stops the browser from 'jumping' when focusing on fields.
+        */
+        input, select, textarea, .form-control, button {
+            font-size: 16px !important; 
+        }
+
         main {
-            flex: 1 ;    
-            border: 2px solid gray;          /* This pushes the footer down */
+            flex: 1;    
+            border: 2px solid gray; 
         }
         footer {
             background-color: #323436;
             color: white;
+            font-size: 16px; /* Ensuring footer text is also standard */
+        }
+
+        /* NAVIGATION STYLING */
+        .overflow-x-auto::-webkit-scrollbar { display: none; }
+        .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .nav-link {
+            white-space: nowrap;
+            /* Corrected from 0.95rem to 1rem to hit the 16px no-zoom threshold */
+            font-size: 1rem !important; 
+            color: #e2e8f0 !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .nav-link i { color: #94a3b8; transition: color 0.3s ease; }
+
+        .hover-lift {
+            border-radius: 12px !important;
+            overflow: hidden;
+        }
+        .hover-lift:hover {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(167, 139, 250, 0.15));
+            color: white !important;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(96, 165, 250, 0.25);
+        }
+        .hover-lift:hover i { color: #60a5fa; }
+
+        .btn-outline-primary:hover {
+            background: #60a5fa !important;
+            color: white !important;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4);
+        }
+
+        .hover-logout:hover {
+            background: rgba(239, 68, 68, 0.2) !important;
+            color: #fca5a5 !important;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+        }
+        .hover-logout:hover i { color: #fca5a5; }
+
+        .active-link {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(167, 139, 250, 0.25)) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(96,165,250,0.4);
+            box-shadow: 0 4px 15px rgba(96,165,250,0.35);
+        }
+        .active-link i {
+            color: #60a5fa !important;
+        }
+
+        @media (min-width: 768px) {
+            .gap-3 { gap: 1rem !important; }
+            .nav-link { font-size: 1rem !important; padding: 0.55rem 1.1rem !important; }
+            .navbar-brand { font-size: 1.6rem; }
+        }
+
+        @media (max-width: 360px) {
+            .nav-link { 
+                padding: 0.5rem 0.8rem !important; 
+                /* Prevent font shrinking on small screens to avoid zoom trigger */
+                font-size: 1rem !important; 
+            }
+            .nav-link i { font-size: 1.1rem; }
         }
     </style>
 </head>
@@ -60,9 +130,7 @@
             <div class="d-flex align-items-center overflow-x-auto flex-nowrap flex-grow-1"
                  style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
                 <div class="d-flex align-items-center gap-3 flex-nowrap">
-
                     {% if not request.user.is_authenticated %}
-                        <!-- Guest links -->
                         <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if request.path == '/' %}active-link{% endif %}"
                            href="{% url 'index' %}">
                             <i class="bi bi-house-door"></i> Home
@@ -76,134 +144,52 @@
                            style="border-color: #60a5fa !important; color: #60a5fa !important;">
                             <i class="bi bi-box-arrow-in-right"></i> Login
                         </a>
-
                     {% else %}
-                        <!-- Authenticated user links -->
                         <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if request.path == '/' or request.path == '/home/' %}active-link{% endif %}"
                            href="{% url 'index' %}">
                             <i class="bi bi-house-door"></i> Home
                         </a>
-
                         <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if 'cart' in request.path %}active-link{% endif %}"
                            href="{% url 'cart' %}">
                             <i class="bi bi-cart"></i> Cart
                         </a>
-
                         <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if 'market' in request.path %}active-link{% endif %}"
                            href="{% url 'market' %}">
                             <i class="bi bi-graph-up"></i> Market
                         </a>
-
                         <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if 'account' in request.path %}active-link{% endif %}"
                            href="{% url 'account' %}">
                             <i class="bi bi-person-circle"></i> Account
                         </a>
-
-            {% if request.user.profile.is_trader %}
-    <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if 'trader' in request.path %}active-link{% endif %}"
-       href="{% url 'trader' %}">
-        <i class="bi bi-briefcase"></i> Trader
-    </a>
-{% endif %}
-
-
+                        {% if request.user.profile.is_trader %}
+                            <a class="nav-link px-3 py-2 rounded-3 fw-medium d-flex align-items-center gap-2 hover-lift {% if 'trader' in request.path %}active-link{% endif %}"
+                               href="{% url 'trader' %}">
+                                <i class="bi bi-briefcase"></i> Trader
+                            </a>
+                        {% endif %}
                         <a class="nav-link px-3 py-2 rounded-3 fw-semibold d-flex align-items-center gap-2 text-danger hover-logout"
                            href="{% url 'logout' %}">
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </a>
                     {% endif %}
-
                 </div>
             </div>
         </div>
     </div>
 </nav>
 
-<!-- PREMIUM COLOR & HOVER STYLING (unchanged, just kept for completeness) -->
-<style>
-    .overflow-x-auto::-webkit-scrollbar { display: none; }
-    .overflow-x-auto { -ms-overflow-style: none; scrollbar-width: none; }
+<main class="container-fluid flex-grow-1 my-0">
+    {% block content %}{% endblock %}
+</main>
 
-    .nav-link {
-        white-space: nowrap;
-        font-size: 0.95rem;
-        color: #e2e8f0 !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-    }
-    .nav-link i { color: #94a3b8; transition: color 0.3s ease; }
-
-    .hover-lift {
-        border-radius: 12px !important;
-        overflow: hidden;
-    }
-    .hover-lift:hover {
-        background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(167, 139, 250, 0.15));
-        color: white !important;
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(96, 165, 250, 0.25);
-    }
-    .hover-lift:hover i { color: #60a5fa; }
-
-    }
-
-    .btn-outline-primary:hover {
-        background: #60a5fa !important;
-        color: white !important;
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4);
-    }
-
-    .hover-logout:hover {
-        background: rgba(239, 68, 68, 0.2) !important;
-        color: #fca5a5 !important;
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
-    }
-    .hover-logout:hover i { color: #fca5a5; }
-
-    /* ACTIVE LINK STYLE – now works on ALL links */
-    .active-link {
-        background: linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(167, 139, 250, 0.25)) !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(96,165,250,0.4);
-        box-shadow: 0 4px 15px rgba(96,165,250,0.35);
-    }
-    .active-link i {
-        color: #60a5fa !important;
-    }
-
-    @media (min-width: 768px) {
-        .gap-3 { gap: 1rem !important; }
-        .nav-link { font-size: 1rem; padding: 0.55rem 1.1rem !important; }
-        .navbar-brand { font-size: 1.6rem; }
-    }
-    @media (max-width: 360px) {
-        .nav-link { padding: 0.5rem 0.8rem !important; font-size: 0.85rem; }
-        .nav-link i { font-size: 1.1rem; }
-    }
-</style>
-
-<!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-
-    <!-- Main Content Area (grows to push footer down) -->
-    <main class="container-fluid flex-grow-1 my-0">
-    {% block content %}
-        
+<footer class="text-center text-white py-3">
+    <div class="container-fluid ">
+        {% block footer %}
+        <p class="mb-0">© {% now "Y" %} Sokohub. All rights reserved.</p>
         {% endblock %}
-    </main>
+    </div>
+</footer>
 
-    <!-- Sticky Footer -->
-    <footer class="text-center text-white">
-        <div class="container-fluid ">
-            {% block footer %}
-            <p class="mb-0">© {% now "Y" %} Sokohub. All rights reserved.</p>
-            {% endblock %}
-        </div>
-    </footer>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
