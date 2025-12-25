@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'playground',
+    'pwa',
 
 ]
 
@@ -120,3 +121,22 @@ MPESA_TOKEN_URL = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=
 MPESA_MIN_AMOUNT = 10  # KES
 
 
+PWA_APP_NAME = 'SokoHub'
+PWA_APP_DESCRIPTION = "Your marketplace for buying and selling"
+PWA_APP_THEME_COLOR = '#0a5d3d'  # Pick a color from your site
+PWA_APP_BACKGROUND_COLOR = '#ffffff'
+PWA_APP_DISPLAY = 'standalone'
+PWA_APP_SCOPE = '/'
+PWA_APP_ORIENTATION = 'any'
+PWA_APP_START_URL = '/'
+PWA_APP_STATUS_BAR_COLOR = 'default'
+PWA_APP_ICONS = [
+    {'src': '/static/images/icon-192.png', 'sizes': '192x192'},
+    {'src': '/static/images/icon-512.png', 'sizes': '512x512'}
+]
+PWA_APP_SPLASH_SCREEN = [
+    {'src': '/static/images/splash-screen.png', 'media': '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)'}
+]
+PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'static/js/service-worker.js')
+PWA_APP_DIR = 'ltr'
+PWA_APP_LANG = 'en-US'
