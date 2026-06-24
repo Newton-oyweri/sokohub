@@ -1,24 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
+  Animated,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CakeCarousel from './Cakes/CakeCarousel';
 import Account from './Account/Account'; 
 import Header, { HEADER_HEIGHT } from '../../components/Header'; 
 import NotificationsModal from '../../components/NotificationsModal'; 
+import { supabase } from '../../lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'cakes' | 'account'>('cakes');
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Auth & Profile states
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState('Guest User');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // 1. Animated value tracker for scroll management
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    checkUserSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        setIsLoggedIn(true);
+        fetchProfileDetails(session.user.id);
+      } else {
+        setIsLoggedIn(false);
+        setUserName('Guest User');
+        setAvatarUrl(null);
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, []);
+
+  const checkUserSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      setIsLoggedIn(true);
+      fetchProfileDetails(session.user.id);
+    }
+  };
+
+  const fetchProfileDetails = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', userId)
+        .single();
+
+      if (data) {
+        setUserName(data.full_name?.trim() || 'New User');
+        setAvatarUrl(data.avatar_url || null);
+      }
+    } catch (err) {
+      console.log('Error fetching greeting assets:', err);
+    }
+  };
+
+  // 2. Map the scroll position to an opacity scale (fades out completely over 80px of scrolling)
+  const greetingOpacity = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={styles.container}>
@@ -28,44 +89,71 @@ export default function App() {
         <Header />
       </View>
 
-      {/* Main Scrollable Content */}
-      <ScrollView 
+      {/* Main Scrollable Content - Changed to Animated.ScrollView */}
+      <Animated.ScrollView 
         style={StyleSheet.absoluteFillObject}
         contentContainerStyle={[styles.scrollContent, { paddingTop: STATUS_BAR_HEIGHT }]}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]} 
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true } // Utilizes hardware acceleration for fluid performance
+        )}
+        scrollEventThrottle={16}
       >
-        <View style={{ height: HEADER_HEIGHT - 60 }} />
+        {/* Dynamic Fading Greeting Row */}
+        <Animated.View 
+          style={[
+            styles.greetingSpacer, 
+            { height: HEADER_HEIGHT - 60, opacity: greetingOpacity }
+          ]}
+        >
+          <Text style={styles.welcomeText}>
+            Welcome, <Text style={styles.highlightText}>{userName}</Text> 👋
+          </Text>
+        </Animated.View>
 
-        {/* Sticky Tabs */}
+        {/* Premium Sticky Tabs */}
         <View style={styles.stickyTabsWrapper}>
           <View style={styles.tabsContainer}>
             
+            {/* Shop Tab */}
             <TouchableOpacity 
-              style={styles.tabButton}
+              style={[styles.tabButton, activeTab === 'cakes' && styles.activeTabButton]}
               onPress={() => setActiveTab('cakes')}
               activeOpacity={0.8}
             >
               <Ionicons
-                name="storefront-outline"
-                size={22}
-                color={activeTab === 'cakes' ? '#E84E7A' : '#9CA3AF'}
+                name={activeTab === 'cakes' ? "storefront" : "storefront-outline"}
+                size={20}
+                color={activeTab === 'cakes' ? '#6b46c1' : '#9CA3AF'}
               />
               <Text style={[styles.tabText, activeTab === 'cakes' && styles.activeTabText]}>
                 Shop
               </Text>
             </TouchableOpacity>
 
+            {/* Account Tab */}
             <TouchableOpacity 
-              style={styles.tabButton}
+              style={[styles.tabButton, activeTab === 'account' && styles.activeTabButton]}
               onPress={() => setActiveTab('account')}
               activeOpacity={0.8}
             >
-              <Ionicons 
-                name={activeTab === 'account' ? "person-circle" : "person-circle-outline"} 
-                size={28} 
-                color={activeTab === 'account' ? "#6b46c1" : "#9CA3AF"} 
-              />
+              {isLoggedIn && avatarUrl ? (
+                <Image 
+                  source={{ uri: avatarUrl }} 
+                  style={[
+                    styles.tabAvatar, 
+                    activeTab === 'account' && styles.activeTabAvatar
+                  ]} 
+                />
+              ) : (
+                <Ionicons 
+                  name={activeTab === 'account' ? "person" : "person-outline"} 
+                  size={20} 
+                  color={activeTab === 'account' ? "#6b46c1" : "#9CA3AF"} 
+                />
+              )}
               <Text style={[styles.tabText, activeTab === 'account' && styles.activeTabText]}>
                 Account
               </Text>
@@ -74,13 +162,13 @@ export default function App() {
           </View>
         </View>
 
-        {/* Content Area */}
+        {/* Content Card Panel */}
         <View style={styles.contentCard}>
           <View style={styles.contentBody}>
-            {activeTab === 'cakes' ? <CakeCarousel /> : <Account />}
+            {activeTab === 'cakes' ? <CakeCarousel />  : <Account />}
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Notification Bell */}
       <TouchableOpacity 
@@ -92,7 +180,6 @@ export default function App() {
         <View style={styles.badgeIndicator} />
       </TouchableOpacity>
 
-      {/* The Custom Left Sliding Drawer Component */}
       <NotificationsModal 
         visible={modalVisible}
         onClose={() => setModalVisible(false)} 
@@ -116,37 +203,76 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
+  greetingSpacer: {
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  welcomeText: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#1f2937',
+    letterSpacing: -0.5,
+  },
+  highlightText: {
+    color: '#6b46c1',
+    fontWeight: '700',
+  },
+  /* Upgraded Premium Sticky Navigation Layout */
   stickyTabsWrapper: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    paddingTop: 16,
-    paddingBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    /* Added padding to prevent overlapping with system components / statusbar */
+    paddingTop: Platform.OS === 'ios' ? 30 : 30, 
+    paddingBottom: 12,
+    shadowColor: '#6b46c1',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.04,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3efff',
   },
   tabsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 30,
+    paddingHorizontal: 20,
+    /* Ensuring clean separation layout structure below device barriers */
+    marginTop: 4, 
   },
   tabButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 10,
-    minWidth: 90,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    minWidth: 120,
+    gap: 8,
+  },
+  activeTabButton: {
+    backgroundColor: '#f3efff',
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#9CA3AF',
-    marginTop: 6,
   },
   activeTabText: {
     color: '#6b46c1',
     fontWeight: '700',
+  },
+  tabAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#9CA3AF',
+  },
+  activeTabAvatar: {
+    borderColor: '#6b46c1',
+    borderWidth: 1.5,
   },
   contentCard: {
     flex: 1,

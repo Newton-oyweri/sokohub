@@ -1,189 +1,404 @@
-// app/(tabs)/Account/AccountTabs/Wallet.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   ActivityIndicator,
-  Alert,
+  RefreshControl,
+  TextInput,
+  Modal,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../../../lib/supabase';
 
-type PaymentMethod = 'mpesa' | 'airtel';
+interface WalletScreenProps {
+  onBack: () => void;
+}
 
-export default function Wallet({ onBack }: { onBack: () => void }) {
+interface Transaction {
+  id: string;
+  amount: number;
+  type: 'DEPOSIT' | 'PURCHASE';
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  reference: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+// UPDATE THIS TO MATCH YOUR CURRENT RUNNING NGROK ENDPOINT
+const BACKEND_URL = 'https://neville-interconfessional-enedina.ngrok-free.dev';
+
+export default function Wallet({ onBack }: WalletScreenProps) {
   const insets = useSafeAreaInsets();
+
+  // Core State
+  const [balance, setBalance] = useState<number>(0);
+  const [currency, setCurrency] = useState<string>('KES');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userPhone, setUserPhone] = useState<string>('');
   
-  // App States
-  const [balance, setBalance] = useState(2450); // Current dynamic balance (KSh)
-  const [amount, setAmount] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('0700000000'); // Default user phone
-  const [method, setMethod] = useState<PaymentMethod>('mpesa');
-  const [isLoading, setIsLoading] = useState(false);
+  // App UI State
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isDepositModalVisible, setIsDepositModalVisible] = useState<boolean>(false);
+  const [depositAmount, setDepositAmount] = useState<string>('');
+  const [isProcessingPush, setIsProcessingPush] = useState<boolean>(false);
 
-  const quickAmounts = ['200', '500', '1000', '2000'];
+  const fetchWalletData = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-  // Handle Push Request to Backend
-  const handleDeposit = async () => {
-    const depositAmount = parseFloat(amount);
-    
-    if (!amount || isNaN(depositAmount) || depositAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount to deposit.');
+      const userId = session.user.id;
+
+      // 1. Fetch user profile data
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+
+      if (profileData?.phone) {
+        setUserPhone(profileData.phone);
+      }
+
+      // 2. Fetch wallet metadata and active balance
+      const { data: walletData, error: walletError } = await supabase
+        .from('wallets')
+        .select('id, balance, currency')
+        .eq('user_id', userId)
+        .single();
+
+      if (walletError && walletError.code === 'PGRST116') {
+        // Wallet doesn't exist, create one
+        const { data: newWallet, error: createError } = await supabase
+          .from('wallets')
+          .insert([
+            {
+              user_id: userId,
+              balance: 0,
+              currency: 'KES'
+            }
+          ])
+          .select('id, balance, currency')
+          .single();
+
+        if (createError) throw createError;
+        
+        if (newWallet) {
+          setBalance(Number(newWallet.balance));
+          setCurrency(newWallet.currency || 'KES');
+          setTransactions([]);
+        }
+      } else if (walletData) {
+        setBalance(Number(walletData.balance));
+        setCurrency(walletData.currency || 'KES');
+
+        // 3. Fetch transactions
+        const { data: txData } = await supabase
+          .from('wallet_transactions')
+          .select('id, amount, type, status, reference, description, created_at')
+          .eq('wallet_id', walletData.id)
+          .order('created_at', { ascending: false })
+          .limit(15);
+
+        if (txData) {
+          setTransactions(txData as Transaction[]);
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching wallet data:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWalletData();
+  }, [fetchWalletData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchWalletData();
+  };
+
+  // Helper function to format phone number for backend
+  const formatPhoneForBackend = (phone: string) => {
+    let cleaned = phone.replace(/\s/g, '');
+    if (cleaned.startsWith('0')) {
+      cleaned = '254' + cleaned.substring(1);
+    } else if (cleaned.startsWith('7')) {
+      cleaned = '254' + cleaned;
+    }
+    return cleaned;
+  };
+
+  // Handle STK Push payment
+  const handleInitiatePayment = async () => {
+    const numericAmount = parseFloat(depositAmount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
       return;
     }
 
-    if (!phoneNumber.trim() || phoneNumber.length < 10) {
-      Alert.alert('Invalid Phone', 'Please enter a valid mobile number.');
+    if (!userPhone) {
+      Alert.alert(
+        'Missing Phone Number',
+        'Please add your phone number to your profile first.'
+      );
       return;
     }
 
-    setIsLoading(true);
+    setIsProcessingPush(true);
 
     try {
-      // TODO: Connect your STK Push backend api endpoint here
-      // const response = await fetch('https://api.yourstartup.com/wallet/deposit', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ amount: depositAmount, phone: phoneNumber, provider: method })
-      // });
-      
-      // Simulating SIM toolkit push delay
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
 
-      // Mock update to show balance changes instantly
-      setBalance(prev => prev + depositAmount);
-      setAmount('');
+      const formattedPhone = formatPhoneForBackend(userPhone);
+
+      const payload = {
+        userId: session.user.id,
+        amount: numericAmount,
+        phone: formattedPhone,
+      };
+
+      const response = await fetch(`${BACKEND_URL}/api/stk-push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        try {
+          const errorJson = JSON.parse(text);
+          throw new Error(errorJson.error || errorJson.details || 'Server error');
+        } catch (parseErr) {
+          throw new Error(`Server returned ${response.status}: ${text.substring(0, 100)}`);
+        }
+      }
+
+      const jsonResult = await response.json();
+
+      // Success
+      setIsDepositModalVisible(false);
+      setDepositAmount('');
       
       Alert.alert(
-        'Request Sent!',
-        `Check your phone for the ${method === 'mpesa' ? 'M-Pesa' : 'Airtel'} PIN prompt to complete the deposit.`
+        'STK Push Sent!',
+        `Check your phone (${userPhone}) for the M-Pesa prompt. Enter your PIN to complete the deposit.`,
+        [{ text: 'OK', onPress: () => onRefresh() }]
       );
-    } catch (error) {
-      Alert.alert('Transaction Failed', 'Something went wrong. Please try again.');
+
+    } catch (err: any) {
+      Alert.alert('Payment Failed', err.message || 'Unable to process payment.');
     } finally {
-      setIsLoading(false);
+      setIsProcessingPush(false);
     }
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const getStatusColor = (status: Transaction['status']) => {
+    switch (status) {
+      case 'SUCCESS': return '#10b981';
+      case 'PENDING': return '#f59e0b';
+      case 'FAILED': return '#ef4444';
+      default: return '#64748b';
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#6b46c1" />
+        <Text style={styles.loadingText}>Loading wallet...</Text>
+      </View>
+    );
+  }
+
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-      style={styles.container}
-    >
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6b46c1']} />
+        }
       >
         {/* Header */}
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton} disabled={isLoading}>
-            <Ionicons name="arrow-back" size={26} color="#1f2937" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1f2937" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Wallet</Text>
         </View>
 
-        {/* Balance Display Card */}
+        {/* Balance Card */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>KSh {balance.toLocaleString()}</Text>
-          <View style={styles.cardFooter}>
-            <Ionicons name="shield-checkmark" size={16} color="#fff" opacity={0.8} />
-            <Text style={styles.securedText}>Secured Wallet Statement</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Top Up Wallet</Text>
-
-        {/* Payment Provider Selector */}
-        <View style={styles.methodRow}>
-          <TouchableOpacity 
-            style={[styles.methodCard, method === 'mpesa' && styles.selectedMpesa]} 
-            onPress={() => setMethod('mpesa')}
-            disabled={isLoading}
-          >
-            <View style={[styles.radio, method === 'mpesa' && styles.radioActiveMpesa]}>
-              {method === 'mpesa' && <View style={styles.radioDot} />}
-            </View>
-            <Text style={[styles.methodName, method === 'mpesa' && styles.textActiveMpesa]}>M-Pesa</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.methodCard, method === 'airtel' && styles.selectedAirtel]} 
-            onPress={() => setMethod('airtel')}
-            disabled={isLoading}
-          >
-            <View style={[styles.radio, method === 'airtel' && styles.radioActiveAirtel]}>
-              {method === 'airtel' && <View style={styles.radioDot} />}
-            </View>
-            <Text style={[styles.methodName, method === 'airtel' && styles.textActiveAirtel]}>Airtel Money</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Input Form Fields */}
-        <View style={styles.formCard}>
-          <Text style={styles.inputLabel}>Amount (KSh)</Text>
-          <TextInput
-            style={styles.amountInput}
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-            placeholder="Enter amount e.g. 500"
-            placeholderTextColor="#94a3b8"
-            editable={!isLoading}
-          />
-
-          {/* Quick Presets */}
-          <View style={styles.presetRow}>
-            {quickAmounts.map((amt) => (
-              <TouchableOpacity 
-                key={amt} 
-                style={styles.presetBtn} 
-                onPress={() => setAmount(amt)}
-                disabled={isLoading}
-              >
-                <Text style={styles.presetText}>+{amt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.inputLabel}>Mobile Money Number</Text>
-          <TextInput
-            style={styles.phoneInput}
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            keyboardType="phone-pad"
-            placeholder="e.g. 0712345678"
-            placeholderTextColor="#94a3b8"
-            editable={!isLoading}
-          />
-        </View>
-
-        {/* Action Trigger button */}
-        <TouchableOpacity 
-          style={[
-            styles.depositButton, 
-            method === 'mpesa' ? styles.btnMpesa : styles.btnAirtel
-          ]} 
-          onPress={handleDeposit}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.depositButtonText}>
-              Pay with {method === 'mpesa' ? 'M-Pesa' : 'Airtel Money'}
+          <View style={styles.balanceRow}>
+            <Text style={styles.currency}>{currency === 'KES' ? 'KSh' : currency}</Text>
+            <Text style={styles.balanceAmount}>
+              {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-          )}
+          </View>
+          <View style={styles.phoneContainer}>
+            <Text style={styles.phoneText}>{userPhone || 'No phone linked'}</Text>
+          </View>
+        </View>
+
+        {/* Deposit Button */}
+        <TouchableOpacity 
+          style={styles.depositButton} 
+          activeOpacity={0.9}
+          onPress={() => setIsDepositModalVisible(true)}
+        >
+          <View style={styles.depositButtonInner}>
+            <Ionicons name="arrow-up-circle" size={24} color="#fff" />
+            <Text style={styles.depositButtonText}>Deposit via Lipa Na M-Pesa</Text>
+          </View>
         </TouchableOpacity>
 
+        {/* Transactions */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Transaction History</Text>
+          <TouchableOpacity onPress={onRefresh}>
+            <Ionicons name="refresh-outline" size={20} color="#6b46c1" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.transactionsContainer}>
+          {transactions.length > 0 ? (
+            transactions.map((item) => {
+              const isDeposit = item.type === 'DEPOSIT';
+              return (
+                <View key={item.id} style={styles.transactionItem}>
+                  <View style={styles.transactionLeft}>
+                    <View style={[
+                      styles.transactionIcon,
+                      { backgroundColor: isDeposit ? '#ecfdf5' : '#fdf4ff' }
+                    ]}>
+                      <Ionicons
+                        name={isDeposit ? 'wallet-outline' : 'cart-outline'}
+                        size={20}
+                        color={isDeposit ? '#10b981' : '#c026d3'}
+                      />
+                    </View>
+                    <View style={styles.transactionInfo}>
+                      <Text style={styles.transactionDescription} numberOfLines={1}>
+                        {item.description || (isDeposit ? 'Funds Deposited' : 'Purchase')}
+                      </Text>
+                      <Text style={styles.transactionDate}>
+                        {formatDate(item.created_at)}
+                      </Text>
+                      <Text style={[styles.transactionStatus, { color: getStatusColor(item.status) }]}>
+                        {item.status}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[
+                    styles.transactionAmount,
+                    { color: isDeposit ? '#10b981' : '#e11dd4' }
+                  ]}>
+                    {isDeposit ? '+' : '-'} {Math.abs(item.amount).toLocaleString()}
+                  </Text>
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="receipt-outline" size={48} color="#c4b5fd" />
+              <Text style={styles.emptyText}>No transactions yet</Text>
+              <Text style={styles.emptySubtext}>Your recent activities will appear here</Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+
+      {/* Deposit Modal */}
+      <Modal
+        visible={isDepositModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => !isProcessingPush && setIsDepositModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={() => !isProcessingPush && setIsDepositModalVisible(false)}
+          />
+          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Deposit Funds</Text>
+              <TouchableOpacity 
+                disabled={isProcessingPush} 
+                onPress={() => setIsDepositModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#4b5563" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalLabel}>Enter Amount (KSh)</Text>
+            <TextInput
+              style={styles.amountInput}
+              placeholder="500"
+              placeholderTextColor="#94a3b8"
+              keyboardType="numeric"
+              value={depositAmount}
+              onChangeText={setDepositAmount}
+              editable={!isProcessingPush}
+              autoFocus={true}
+            />
+
+            <View style={styles.phoneInfoBox}>
+              <Text style={styles.phoneInfoText}>
+                Phone: <Text style={styles.phoneInfoValue}>{userPhone || 'No phone'}</Text>
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, isProcessingPush && styles.submitButtonDisabled]}
+              onPress={handleInitiatePayment}
+              disabled={isProcessingPush}
+            >
+              {isProcessingPush ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitButtonText}>Confirm</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   );
 }
 
@@ -192,13 +407,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f4ff',
   },
-  scrollContent: {
-    padding: 16,
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b46c1',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    paddingTop: 8,
   },
   backButton: {
     padding: 8,
@@ -208,171 +436,239 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#1f2937',
-    marginLeft: 12,
+    marginLeft: 8,
   },
   balanceCard: {
     backgroundColor: '#6b46c1',
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 20,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    marginBottom: 24,
     shadowColor: '#6b46c1',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 28,
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+    alignItems: 'center',
   },
   balanceLabel: {
-    color: '#e0d9ff',
-    fontSize: 14,
+    fontSize: 13,
+    color: '#e9d5ff',
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 8,
+  },
+  currency: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#e9d5ff',
+    marginRight: 4,
   },
   balanceAmount: {
-    color: '#fff',
-    fontSize: 34,
+    fontSize: 36,
     fontWeight: '800',
-    marginTop: 6,
-    marginBottom: 16,
+    color: '#ffffff',
   },
-  cardFooter: {
+  phoneContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
   },
-  securedText: {
-    color: '#e0d9ff',
-    fontSize: 12,
-    marginLeft: 6,
+  phoneText: {
+    fontSize: 13,
+    color: '#f3e8ff',
     fontWeight: '500',
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 12,
-  },
-  methodRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  methodCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  depositButton: {
     backgroundColor: '#fff',
-    padding: 16,
     borderRadius: 16,
-    marginHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  selectedMpesa: {
-    borderColor: '#10b981',
-    backgroundColor: '#f0fdf4',
-  },
-  selectedAirtel: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  radioActiveMpesa: { borderColor: '#10b981' },
-  radioActiveAirtel: { borderColor: '#ef4444' },
-  radioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-  },
-  methodName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  textActiveMpesa: { color: '#15803d' },
-  textActiveAirtel: { color: '#b91c1c' },
-  formCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
+    marginBottom: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  amountInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 12,
-  },
-  presetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  presetBtn: {
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  presetText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  phoneInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  depositButton: {
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
   },
-  btnMpesa: {
-    backgroundColor: '#10b981',
-    shadowColor: '#10b981',
-  },
-  btnAirtel: {
-    backgroundColor: '#ef4444',
-    shadowColor: '#ef4444',
+  depositButtonInner: {
+    backgroundColor: '#6b46c1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
   },
   depositButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  transactionsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8fafc',
+  },
+  transactionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  transactionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  transactionInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  transactionDescription: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  transactionStatus: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  transactionAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#94a3b8',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4b5563',
+    marginBottom: 8,
+  },
+  amountInput: {
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 18,
+    color: '#1f2937',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  phoneInfoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 24,
+  },
+  phoneInfoText: {
+    fontSize: 14,
+    color: '#4b5563',
+  },
+  phoneInfoValue: {
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  submitButton: {
+    backgroundColor: '#6b46c1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#a78bfa',
+  },
+  submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',

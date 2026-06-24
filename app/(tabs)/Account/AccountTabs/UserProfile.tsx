@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,52 +8,123 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../../../lib/supabase'; // Adjust this import path relative to your file system
+
+// Preset Avatars from your Supabase Storage Bucket
+const AVATARS = [
+  { id: 'male', url: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/profile_avatar/maleavatar.jfif' },
+  { id: 'female', url: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/profile_avatar/femaleavatar.png' }
+];
 
 export default function UserProfile({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
 
-  // 1. Backend-ready state management
+  // Lifecycle States
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Core startup details needed for delivery tracking & notifications
-  const [name, setName] = useState('K.U. Student');
-  const [email, setEmail] = useState('k.uymt@gmail.com');
-  const [phone, setPhone] = useState('+254 700 000 000');
+  // States matching your public.profiles table schema
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(AVATARS[0].url);
 
-  // 2. Mock handler for saving to a backend database
-  const handleSave = async () => {
-    // Basic frontend validations before hitting the network
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      Alert.alert('Error', 'All fields are required for deliveries.');
-      return;
-    }
+  // Track if the user has triggered avatar choosing mode while editing
+  const [isChoosingAvatar, setIsChoosingAvatar] = useState(false);
 
-    setIsLoading(true);
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
 
+  const fetchUserProfile = async () => {
     try {
-      // TODO: Replace this with your actual backend integration, e.g.:
-      // const response = await fetch('https://your-api.com/user/update', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ name, email, phone })
-      // });
-      // if (!response.ok) throw new Error();
+      setIsLoading(true);
+      
+      // 1. Get the current logged-in authenticated user session
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        Alert.alert('Authentication Error', 'Please log in to manage your profile.');
+        onBack();
+        return;
+      }
 
-      // Simulating a network delay
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      setUserId(user.id);
 
-      Alert.alert('Success', 'Profile updated successfully.');
-      setIsEditing(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      // 2. Fetch profile from public.profiles schema table
+      const { data, error, status } = await supabase
+        .from('profiles')
+        .select('full_name, phone, avatar_url')
+        .eq('id', user.id)
+        .single();
+
+      if (error && status !== 406) {
+        throw error;
+      }
+
+      if (data) {
+        setName(data.full_name || '');
+        setPhone(data.phone || '');
+        setAvatarUrl(data.avatar_url || AVATARS[0].url);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An error occurred fetching your profile data.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleSave = async () => {
+    if (!userId) return;
+
+    if (!name.trim() || !phone.trim()) {
+      Alert.alert('Validation Error', 'All personal details are required for deliveries.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          full_name: name.trim(),
+          phone: phone.trim(),
+          avatar_url: avatarUrl,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Profile updated successfully.');
+      setIsEditing(false);
+      setIsChoosingAvatar(false);
+    } catch (error: any) {
+      Alert.alert('Save Error', error.message || 'Failed to update backend profile.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setIsChoosingAvatar(false);
+    fetchUserProfile(); // Restores original database entries
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#6b46c1" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView 
@@ -63,22 +134,58 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton} disabled={isLoading}>
+        <TouchableOpacity onPress={onBack} style={styles.backButton} disabled={isSaving}>
           <Ionicons name="arrow-back" size={26} color="#1f2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>User Profile</Text>
+        <Text style={styles.headerTitle}>My Profile</Text>
       </View>
 
-      {/* Profile Picture Status */}
+      {/* Dynamic Avatar UI Section */}
       <View style={styles.profileSection}>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person" size={70} color="#6b46c1" />
-        </View>
-        <Text style={styles.userName}>{name}</Text>
-        <Text style={styles.userEmail}>{email}</Text>
+        {isEditing && isChoosingAvatar ? (
+          /* Avatar selector shown inside the screen instead of the original image */
+          <View style={styles.selectorContainer}>
+            <Text style={styles.selectorTitle}>Choose Avatar</Text>
+            <View style={styles.avatarGrid}>
+              {AVATARS.map((avatar) => (
+                <TouchableOpacity 
+                  key={avatar.id} 
+                  onPress={() => {
+                    setAvatarUrl(avatar.url);
+                    setIsChoosingAvatar(false); // Snap back to view selected avatar
+                  }}
+                  style={[
+                    styles.gridAvatarWrapper, 
+                    avatarUrl === avatar.url && styles.selectedGridAvatar
+                  ]}
+                >
+                  <Image source={{ uri: avatar.url }} style={styles.gridAvatarImage} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          /* Normal viewing / editing mode showing avatar picture */
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            onPress={() => isEditing && setIsChoosingAvatar(true)}
+            disabled={!isEditing || isSaving}
+          >
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          </TouchableOpacity>
+        )}
+        
+        {!isChoosingAvatar && (
+          <>
+            <Text style={styles.userName}>{name.trim() || 'New User'}</Text>
+            {isEditing && (
+              <Text style={styles.changeHint}>Tap image to change avatar</Text>
+            )}
+          </>
+        )}
       </View>
 
-      {/* Dynamic Profile Details Form */}
+      {/* Personal Information Form */}
       <View style={styles.infoCard}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
         
@@ -91,28 +198,10 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
               value={name}
               onChangeText={setName}
               placeholder="Enter full name"
-              editable={!isLoading}
+              editable={!isSaving}
             />
           ) : (
-            <Text style={styles.value}>{name}</Text>
-          )}
-        </View>
-
-        {/* Email Row */}
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Email Address</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholder="Enter email"
-              editable={!isLoading}
-            />
-          ) : (
-            <Text style={styles.value}>{email}</Text>
+            <Text style={styles.value}>{name || 'Not Set'}</Text>
           )}
         </View>
 
@@ -126,21 +215,21 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
               onChangeText={setPhone}
               keyboardType="phone-pad"
               placeholder="Enter phone number"
-              editable={!isLoading}
+              editable={!isSaving}
             />
           ) : (
-            <Text style={styles.value}>{phone}</Text>
+            <Text style={styles.value}>{phone || 'Not Set'}</Text>
           )}
         </View>
       </View>
 
-      {/* Action Buttons */}
+      {/* Action Controller Buttons */}
       {isEditing ? (
         <View style={styles.actionRow}>
           <TouchableOpacity 
             style={[styles.btn, styles.cancelButton]} 
-            onPress={() => setIsEditing(false)}
-            disabled={isLoading}
+            onPress={handleCancel}
+            disabled={isSaving}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -148,9 +237,9 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
           <TouchableOpacity 
             style={[styles.btn, styles.saveButton]} 
             onPress={handleSave}
-            disabled={isLoading}
+            disabled={isSaving}
           >
-            {isLoading ? (
+            {isSaving ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Text style={styles.saveButtonText}>Save</Text>
@@ -174,8 +263,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f4ff',
   },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
     padding: 16,
+    marginBottom: "90%",
   },
   header: {
     flexDirection: 'row',
@@ -195,6 +289,8 @@ const styles = StyleSheet.create({
   profileSection: {
     alignItems: 'center',
     marginBottom: 32,
+    minHeight: 160,
+    justifyContent: 'center',
   },
   avatarContainer: {
     width: 120,
@@ -203,18 +299,61 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0d9ff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  changeHint: {
+    fontSize: 13,
+    color: '#6b46c1',
+    fontWeight: '500',
+    marginTop: 4,
   },
   userName: {
     fontSize: 24,
     fontWeight: '700',
     color: '#1f2937',
   },
-  userEmail: {
-    fontSize: 16,
-    color: '#6b46c1',
-    marginTop: 4,
+  /* Embedded Choose Avatar Panel styles */
+  selectorContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2d9ff',
   },
+  selectorTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#6b46c1',
+    marginBottom: 12,
+  },
+  avatarGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  gridAvatarWrapper: {
+    borderWidth: 3,
+    borderColor: 'transparent',
+    borderRadius: 44,
+    padding: 2,
+  },
+  selectedGridAvatar: {
+    borderColor: '#6b46c1',
+  },
+  gridAvatarImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+  },
+  /* Card Layouts */
   infoCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -299,7 +438,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   saveButton: {
-    backgroundColor: '#10b981', // Clean startup green for saving successfully
+    backgroundColor: '#10b981',
   },
   saveButtonText: {
     color: '#fff',

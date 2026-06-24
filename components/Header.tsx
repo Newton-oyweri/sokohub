@@ -30,7 +30,7 @@ export default function Header() {
     >
       {/* Animated Background */}
       <LottieView
-        source={require('../assets/json/Fireworks.json')}
+        source={require('../assets/json/cake.json')}
         autoPlay
         loop
         resizeMode="cover"
@@ -47,11 +47,11 @@ export default function Header() {
       {/* Soft overlay for text readability */}
       <View style={styles.overlay} />
 
-      {/* Branding */}
-      <View style={styles.headerOverlay}>
-        <Text style={styles.title}>Wonderland</Text>
+      {/* Branding - Positioned Top Right Side */}
+      <View style={[styles.headerOverlay, { paddingTop: STATUS_BAR_HEIGHT + 16 }]}>
+        <Text style={styles.title}>Wonderbakes</Text>
         <Text style={styles.subtitle}>
-          CAKES & MORE
+          Your everyday dessert!
         </Text>
       </View>
     </View>
@@ -82,11 +82,15 @@ const styles = StyleSheet.create({
   },
 
   headerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 0,
+    left: 0, // Allows text alignment formatting blocks to compute safely
+
+    // Align content explicitly to the top right side
+    alignItems: 'flex-end', 
+    justifyContent: 'flex-start',
 
     paddingHorizontal: 24,
-    paddingBottom: '20%',
 
     zIndex: 2,
   },
@@ -95,6 +99,7 @@ const styles = StyleSheet.create({
     fontSize: 40,
     fontWeight: '900',
     color: '#ffffff',
+    textAlign: 'right',
 
     letterSpacing: -1,
 
@@ -111,6 +116,7 @@ const styles = StyleSheet.create({
 
     fontSize: 13,
     fontWeight: '700',
+    textAlign: 'right',
 
     color: 'rgba(255,255,255,0.85)',
 

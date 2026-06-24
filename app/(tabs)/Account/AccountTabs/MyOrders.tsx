@@ -1,18 +1,14 @@
 // app/(tabs)/Account/AccountTabs/MyOrders.tsx
 import React from 'react';
 import { router } from 'expo-router';
-
-
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const orders = [
   {
@@ -54,8 +50,6 @@ const orders = [
 ];
 
 export default function MyOrders({ onBack }: { onBack: () => void }) {
-  const insets = useSafeAreaInsets();
-
   const renderOrderItem = ({ item }: { item: typeof orders[0] }) => {
     return (
       <View style={styles.orderCard}>
@@ -86,36 +80,34 @@ export default function MyOrders({ onBack }: { onBack: () => void }) {
           </View>
         </View>
 
-
-{/* Dynamic Action Footer */}
-<View style={styles.cardFooter}>
-  {item.status === 'Processing' ? (
-    <TouchableOpacity 
-      style={[styles.actionButton, styles.primaryActionButton]}
-      onPress={() => {
-        // Pushes the user to your TrackOrder screen, passing the Order ID as a parameter
-        router.push({
-          pathname: '../trackorder',
-          params: { id: item.id }
-        });
-      }}
-    >
-      <Ionicons name="map-outline" size={16} color="#fff" style={styles.btnIcon} />
-      <Text style={styles.primaryActionText}>Track Live</Text>
-    </TouchableOpacity>
-  ) : (
-    <TouchableOpacity style={[styles.actionButton, styles.secondaryActionButton]}>
-      <Ionicons name="receipt-outline" size={16} color="#6b46c1" style={styles.btnIcon} />
-      <Text style={styles.secondaryActionText}>Order Completed</Text>
-    </TouchableOpacity>
-  )}
-</View>
+        {/* Dynamic Action Footer */}
+        <View style={styles.cardFooter}>
+          {item.status === 'Processing' ? (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.primaryActionButton]}
+              onPress={() => {
+                router.push({
+                  pathname: '../trackorder',
+                  params: { id: item.id }
+                });
+              }}
+            >
+              <Ionicons name="map-outline" size={16} color="#fff" style={styles.btnIcon} />
+              <Text style={styles.primaryActionText}>Track Live</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.actionButton, styles.secondaryActionButton]}>
+              <Ionicons name="receipt-outline" size={16} color="#6b46c1" style={styles.btnIcon} />
+              <Text style={styles.secondaryActionText}>Order Completed</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
 
   return (
-    <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
+    <View style={styles.container}>
       {/* Header Layout */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -124,20 +116,20 @@ export default function MyOrders({ onBack }: { onBack: () => void }) {
         <Text style={styles.headerTitle}>Order History</Text>
       </View>
 
-      {/* Orders List */}
-      <FlatList
-        data={orders}
-        keyExtractor={(item) => item.id}
-        renderItem={renderOrderItem}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
+      {/* Orders List - No scroll logic, just render items */}
+      <View style={styles.listContent}>
+        {orders.map((item) => (
+          <View key={item.id}>
+            {renderOrderItem({ item })}
+          </View>
+        ))}
+        {orders.length === 0 && (
           <View style={styles.emptyContainer}>
             <Ionicons name="receipt-outline" size={64} color="#94a3b8" />
             <Text style={styles.emptyText}>No orders found yet</Text>
           </View>
-        }
-      />
+        )}
+      </View>
     </View>
   );
 }
@@ -151,6 +143,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    paddingTop: 16,
     marginBottom: 16,
   },
   backButton: {

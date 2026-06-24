@@ -2,7 +2,8 @@
 
 # dependencies
 node_modules/
-
+# json
+sokohub-38103-firebase-adminsdk-fbsvc-f5ec02a156.json
 # Expo
 .expo/
 dist/

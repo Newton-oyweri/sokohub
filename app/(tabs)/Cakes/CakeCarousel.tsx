@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Market from './Market';
+import Market from './MarketSection';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.78;        // Slightly wider for better look

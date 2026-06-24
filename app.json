@@ -1,67 +1,92 @@
 {
-"expo": {
-"name": "Wonderbakes",
-"slug": "sokohub",
-"version": "1.0.0",
-"orientation": "portrait",
-"icon": "./assets/images/icon.png",
-"scheme": "sokohub",
-"userInterfaceStyle": "automatic",
+  "expo": {
+    "name": "Wonderbakes",
+    "slug": "sokohub",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "sokohub",
+    "userInterfaceStyle": "automatic",
 
-"ios": {
-  "supportsTablet": true
-},
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.isackskyla.sokohub",
+      "associatedDomains": [
+        "applinks:sokohub.com"
+      ]
+    },
 
-"android": {
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/images/icon.png",
-    "backgroundColor": "#FFF4E6"
-  },
-  "predictiveBackGestureEnabled": false,
-  "package": "com.isackskyla.sokohub"
-},
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#FFF4E6"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.isackskyla.sokohub",
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "sokohub",
+              "host": "resetpassword",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "*.supabase.co",
+              "pathPrefix": "/auth/v1/verify"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
 
-"web": {
-  "bundler": "metro",
-  "output": "static",
-  "favicon": "./assets/images/notification-icon.png"
-},
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/notification-icon.png"
+    },
 
-"plugins": [
-  "expo-router",
-  "expo-font",
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/notification-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#6b46c1"
+        }
+      ],
+      "expo-web-browser",
+      "expo-dev-client",
+      
+    ],
 
-  [
-    "expo-splash-screen",
-    {
-      "image": "./assets/images/notification-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+    "experiments": {
+      "typedRoutes": true
+    },
+
+    "extra": {
+      "router": {
+        "origin": "https://sokohub.com"
+      },
+      "eas": {
+        "projectId": "41c96e3f-d6b2-49fd-bccc-323ce431dcfb"
+      }
     }
-  ],
-
-  [
-    "expo-notifications",
-    {
-      "icon": "./assets/images/notification-icon.png",
-      "color": "#6b46c1"
-    }
-  ],
-
-  "expo-web-browser",
-  "expo-dev-client"
-],
-
-"experiments": {
-  "typedRoutes": true
-},
-
-"extra": {
-  "router": {},
-  "eas": {
-    "projectId": "41c96e3f-d6b2-49fd-bccc-323ce431dcfb"
   }
-}
-
-}
 }
