@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "sokohub",
     "userInterfaceStyle": "automatic",
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.isackskyla.sokohub",
@@ -15,7 +14,6 @@
         "applinks:sokohub.com"
       ]
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
@@ -46,13 +44,11 @@
         }
       ]
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/notification-icon.png"
     },
-
     "plugins": [
       "expo-router",
       "expo-font",
@@ -73,13 +69,11 @@
       ],
       "expo-web-browser",
       "expo-dev-client",
-      
+      "@react-native-community/datetimepicker"
     ],
-
     "experiments": {
       "typedRoutes": true
     },
-
     "extra": {
       "router": {
         "origin": "https://sokohub.com"

@@ -1,38 +1,99 @@
 // MarketSection.tsx
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../../lib/supabase';
 
 import CategoryTabs from './CategoryTabs';
 import ProductGrid from './ProductGrid';
 
-const marketItems = [
-  // Cakes...
-  { id: 'c1', name: 'skyla favourite', category: 'cakes', price: 600, rating: 4.8, salesCount: 142, image: require('../../../assets/images/town.png') },
-  { id: 'c2', name: 'Blueberry Cheesecake', category: 'cakes', price: 650, rating: 4.9, salesCount: 98, image: require('../../../assets/images/town.png') },
-  { id: 'c3', name: 'Classic Chocolate', category: 'cakes', price: 450, rating: 4.7, salesCount: 215, image: require('../../../assets/images/cake.png') },
-  { id: 'c4', name: 'Strawberry Bliss', category: 'cakes', price: 550, rating: 4.8, salesCount: 167, image: require('../../../assets/images/moist.png') },
+// Type definition for product from Supabase
+interface Product {
+  id: string;
+  name: string;
+  category: 'cake' | 'pizza' | 'flowers';
+  price: number;
+  description: string;
+  image_urls: string[];
+  is_available: boolean;
+  post_type: 'sale' | 'booking' | 'pinned';
+  seller_id: string;
+  created_at: string;
+  updated_at: string;
+}
 
-  // Pizzas...
-  { id: 'p1', name: 'Cheesy Veggie Pizza', category: 'pizza', price: 1200, rating: 4.6, salesCount: 95, image: require('../../../assets/images/town.png') },
-  { id: 'p2', name: 'Meat Lovers Pizza', category: 'pizza', price: 1300, rating: 4.5, salesCount: 76, image: require('../../../assets/images/town.png') },
-  { id: 'p3', name: 'Margherita Classic', category: 'pizza', price: 900, rating: 4.7, salesCount: 120, image: require('../../../assets/images/cake.png') },
 
-  // Flowers...
-  { id: 'f1', name: 'Red Roses Bouquet', category: 'flowers', price: 1000, rating: 4.9, salesCount: 68, image: require('../../../assets/images/rose.webp') },
-  { id: 'f2', name: 'Single Red Rose', category: 'flowers', price: 300, rating: 4.8, salesCount: 50, image: require('../../../assets/images/moist.png') },
-  { id: 'f3', name: 'Mixed Flower Bouquet', category: 'flowers', price: 850, rating: 4.7, salesCount: 42, image: require('../../../assets/images/milk.png') },
-];
 
 export default function MarketSection() {
   const insets = useSafeAreaInsets();
-  const [filteredItems, setFilteredItems] = useState(marketItems);
+  const [filteredItems, setFilteredItems] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch products from Supabase
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_available', true)       
+      .eq('post_type', 'sale')       
+      .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setAllProducts(data);
+        setFilteredItems(data);
+      }
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Failed to load products. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Handle filter changes from CategoryTabs
+  const handleFilterChange = (filtered: Product[]) => {
+    setFilteredItems(filtered);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.centerContainer, { paddingBottom: insets.bottom + 20 }]}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+        <Text style={styles.loadingText}>Loading delicious treats...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={[styles.centerContainer, { paddingBottom: insets.bottom + 20 }]}>
+        <Text style={styles.errorText}>⚠️ {error}</Text>
+        <Text style={styles.retryText} onPress={fetchProducts}>
+          Tap to retry
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.marketContainer, { paddingBottom: insets.bottom + 20 }]}>
       <CategoryTabs 
-        marketItems={marketItems} 
-        onFiltersChange={setFilteredItems} 
+        marketItems={allProducts} 
+        onFiltersChange={handleFilterChange} 
       />
       <ProductGrid items={filteredItems} />
     </View>
@@ -43,5 +104,30 @@ const styles = StyleSheet.create({
   marketContainer: {
     paddingHorizontal: 16,
     marginTop: 8,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+    fontFamily: 'Inter_400Regular',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  retryText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#8B5CF6',
+    fontFamily: 'Inter_600SemiBold',
+    textDecorationLine: 'underline',
   },
 });

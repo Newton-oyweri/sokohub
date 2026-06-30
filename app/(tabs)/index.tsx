@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+
+  import { router } from "expo-router";
 import {
   View,
   Text,
@@ -13,14 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import CakeCarousel from './Cakes/CakeCarousel';
 import Account from './Account/Account'; 
 import Header, { HEADER_HEIGHT } from '../../components/Header'; 
-import NotificationsModal from '../../components/NotificationsModal'; 
 import { supabase } from '../../lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'cakes' | 'account'>('cakes');
-  const [modalVisible, setModalVisible] = useState(false);
 
   // Auth & Profile states
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -170,20 +170,20 @@ export default function App() {
         </View>
       </Animated.ScrollView>
 
-      {/* Notification Bell */}
-      <TouchableOpacity 
-        style={[styles.fixedNotifIconContainer, { top: STATUS_BAR_HEIGHT + 12 }]} 
-        activeOpacity={0.7}
-        onPress={() => setModalVisible(true)}
-      >
-        <Ionicons name="notifications-outline" size={24} color="#1F2937" />
-        <View style={styles.badgeIndicator} />
-      </TouchableOpacity>
 
-      <NotificationsModal 
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)} 
-      />
+{/* Notification Bell */}
+<TouchableOpacity
+  style={[styles.fixedNotifIconContainer, { top: STATUS_BAR_HEIGHT + 12 }]}
+  activeOpacity={0.7}
+  onPress={() => router.push("/notifications")}
+>
+  <Ionicons
+    name="notifications-outline"
+    size={24}
+    color="#1F2937"
+  />
+  <View style={styles.badgeIndicator} />
+</TouchableOpacity>
     </View>
   );
 }

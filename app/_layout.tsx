@@ -16,6 +16,7 @@ import 'react-native-reanimated';
 import { Stack, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '../lib/supabase';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -127,11 +128,12 @@ export default function RootLayout() {
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
-      
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="auth" />
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
+        
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="auth" />
         <Stack.Screen name="(tabs)" />
       </Stack>
 
@@ -184,6 +186,7 @@ export default function RootLayout() {
         </View>
       </Modal>
     </GestureHandlerRootView>
+     </SafeAreaProvider>
   );
 }
 

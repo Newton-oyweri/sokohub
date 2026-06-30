@@ -16,7 +16,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const categories = [
   {
-    id: 'cakes',
+    id: 'cake',
     label: 'Cakes',
     subtitle: 'Celebrate Sweetly',
     image: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/menucakeimage-min.png',
@@ -35,7 +35,7 @@ const categories = [
   },
 ];
 
-type PriceFilter = 'all' | 'under-500' | '500-1000' | 'above-1000';
+type PriceFilter = 'all' | 'under-1000' | '1000-3000' | 'above-3000';
 
 type CategoryTabsProps = {
   marketItems: any[];
@@ -43,7 +43,8 @@ type CategoryTabsProps = {
 };
 
 export default function CategoryTabs({ marketItems, onFiltersChange }: CategoryTabsProps) {
-  const [activeCategory, setActiveCategory] = useState<string>('cakes');
+  // 🔥 CHANGE: Default to 'cake' 
+  const [activeCategory, setActiveCategory] = useState<string>('cake');
   const [searchQuery, setSearchQuery] = useState('');
   const [activePriceFilter, setActivePriceFilter] = useState<PriceFilter>('all');
 
@@ -60,13 +61,13 @@ export default function CategoryTabs({ marketItems, onFiltersChange }: CategoryT
 
     // Price filter
     switch (activePriceFilter) {
-      case 'under-500':
-        result = result.filter(item => item.price < 500);
+      case 'under-1000':
+        result = result.filter(item => item.price < 1000);
         break;
-      case '500-1000':
+      case '1000-3000':
         result = result.filter(item => item.price >= 500 && item.price <= 1000);
         break;
-      case 'above-1000':
+      case 'above-3000':
         result = result.filter(item => item.price > 1000);
         break;
       default:
@@ -137,9 +138,9 @@ export default function CategoryTabs({ marketItems, onFiltersChange }: CategoryT
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[
             { id: 'all', label: 'All Prices' },
-            { id: 'under-500', label: 'Under 500' },
-            { id: '500-1000', label: '500 - 1000' },
-            { id: 'above-1000', label: 'Above 1000' },
+            { id: 'under-1000', label: 'Under 1000' },
+            { id: '1000-3000', label: '1000 - 3000' },
+            { id: 'above-3000', label: 'Above 3000' },
           ].map((filter) => (
             <TouchableOpacity
               key={filter.id}

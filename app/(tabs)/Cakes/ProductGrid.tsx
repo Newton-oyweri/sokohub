@@ -17,6 +17,20 @@ type ProductGridProps = {
 export default function ProductGrid({ items }: ProductGridProps) {
   const router = useRouter();
 
+  // Helper to get first image from array or fallback
+  const getProductImage = (item: any) => {
+    // Check if image_urls exists and is an array with items
+    if (item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) {
+      return { uri: item.image_urls[0] };
+    }
+    // Fallback to static image if item.image exists (for backwards compatibility)
+    if (item.image) {
+      return item.image;
+    }
+    // Default placeholder
+    return require('../../../assets/images/town.png');
+  };
+
   const itemRows = useMemo(() => {
     const rows = [];
     for (let i = 0; i < items.length; i += 2) {
@@ -25,31 +39,40 @@ export default function ProductGrid({ items }: ProductGridProps) {
     return rows;
   }, [items]);
 
-  const renderMarketItem = (item: any) => (
-    <TouchableOpacity 
-      key={item.id}
-      style={styles.itemCard}
-      onPress={() => router.push(`../review`)}
-      activeOpacity={0.9}
-    >
-      <Image source={item.image} style={styles.itemImage} resizeMode="cover" />
-      
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.itemPrice}>KSh {item.price}</Text>
-        <Text style={styles.itemMeta}>
-          ★ {item.rating} • {item.salesCount} sold
-        </Text>
-
-        <TouchableOpacity 
-          style={styles.smallOrderBtn}
-          onPress={() => router.push('../order')}
-        >
-          <Text style={styles.smallOrderBtnText}>Buy Now</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderMarketItem = (item: any) => {
+    const imageSource = getProductImage(item);
+    const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+    
+    return (
+      <TouchableOpacity 
+        key={item.id}
+        style={styles.itemCard}
+        onPress={() => router.push(`../review?id=${item.id}`)}
+        activeOpacity={0.9}
+      >
+        <Image 
+          source={imageSource} 
+          style={styles.itemImage} 
+          resizeMode="cover"
+          defaultSource={require('../../../assets/images/town.png')}
+        />
+        
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.itemPrice}>KSh {price.toFixed(2)}</Text>
+          <TouchableOpacity 
+            style={styles.smallOrderBtn}
+            onPress={() => router.push({
+              pathname: '../order',
+              params: { id: item.id }
+            })}
+          >
+            <Text style={styles.smallOrderBtnText}>Buy Now</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.gridContainer}>
@@ -92,7 +115,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   spacerCard: { width: '48%', backgroundColor: 'transparent' },
-  itemImage: { width: '100%', height: 160 },
+  itemImage: { 
+    width: '100%', 
+    height: 160,
+    backgroundColor: '#f1f5f9',
+  },
   itemInfo: {
     padding: 12,
     position: 'relative',
@@ -111,9 +138,25 @@ const styles = StyleSheet.create({
     color: '#6b46c1',
     marginBottom: 4,
   },
-  itemMeta: {
-    fontSize: 12,
-    color: '#64748b',
+  itemCategory: {
+    fontSize: 11,
+    color: '#94a3b8',
+    textTransform: 'capitalize',
+    marginBottom: 4,
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(107, 70, 193, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
   },
   smallOrderBtn: {
     position: 'absolute',
