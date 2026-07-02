@@ -72,22 +72,10 @@ export default function MarketSection() {
     return (
       <View style={[styles.centerContainer, { paddingBottom: insets.bottom + 20 }]}>
         <ActivityIndicator size="large" color="#8B5CF6" />
-        <Text style={styles.loadingText}>Loading delicious treats...</Text>
       </View>
     );
   }
 
-  // Error state
-  if (error) {
-    return (
-      <View style={[styles.centerContainer, { paddingBottom: insets.bottom + 20 }]}>
-        <Text style={styles.errorText}>⚠️ {error}</Text>
-        <Text style={styles.retryText} onPress={fetchProducts}>
-          Tap to retry
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.marketContainer, { paddingBottom: insets.bottom + 20 }]}>

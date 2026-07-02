@@ -17,6 +17,7 @@ import { Stack, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '../lib/supabase';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import NotificationSetup from '@/components/NotificationSetup';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -131,6 +132,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
+          <NotificationSetup />
         
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="auth" />

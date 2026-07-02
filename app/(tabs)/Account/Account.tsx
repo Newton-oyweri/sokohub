@@ -31,6 +31,7 @@ export default function AccountContent() {
   const [userEmail, setUserEmail] = useState<string>('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [orderCount, setOrderCount] = useState<number>(0);
 
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
@@ -75,6 +76,21 @@ export default function AccountContent() {
     }
   }, []);
 
+  const fetchOrderCount = useCallback(async (userId: string) => {
+    try {
+      const { count, error } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('customer_id', userId);
+
+      if (error) throw error;
+      setOrderCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching order count:', error);
+      setOrderCount(0);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -87,6 +103,7 @@ export default function AccountContent() {
           setUserEmail(session.user.email || '');
           await fetchUserProfile(session.user.id);
           await fetchWalletBalance(session.user.id);
+          await fetchOrderCount(session.user.id);
         } else if (mounted) {
           setIsLoggedIn(false);
           resetGuestState();
@@ -109,6 +126,7 @@ export default function AccountContent() {
           setUserEmail(session.user.email || '');
           await fetchUserProfile(session.user.id);
           await fetchWalletBalance(session.user.id);
+          await fetchOrderCount(session.user.id);
         } else {
           setIsLoggedIn(false);
           resetGuestState();
@@ -121,13 +139,14 @@ export default function AccountContent() {
       mounted = false;
       authListener?.subscription.unsubscribe();
     };
-  }, [fetchUserProfile, fetchWalletBalance]);
+  }, [fetchUserProfile, fetchWalletBalance, fetchOrderCount]);
 
   const resetGuestState = () => {
     setUserName('Guest User');
     setUserEmail('');
     setAvatarUrl(null);
     setWalletBalance(null);
+    setOrderCount(0);
   };
 
   const onRefresh = async () => {
@@ -137,6 +156,7 @@ export default function AccountContent() {
       setUserEmail(session.user.email || '');
       await fetchUserProfile(session.user.id);
       await fetchWalletBalance(session.user.id);
+      await fetchOrderCount(session.user.id);
     }
     setRefreshing(false);
   };
@@ -160,6 +180,7 @@ export default function AccountContent() {
     if (session) {
       await fetchUserProfile(session.user.id);
       await fetchWalletBalance(session.user.id);
+      await fetchOrderCount(session.user.id);
     }
   };
 
@@ -279,13 +300,17 @@ export default function AccountContent() {
             onPress={handleOrdersPress}
           >
             <View style={styles.menuLeftContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#67e8f9' }]}>
-                <Ionicons name="cart-outline" size={28} color="#155e75" />
+              <View style={[styles.iconContainer, { backgroundColor: '#fecaca' }]}>
+                <Ionicons name="receipt-outline" size={28} color="#991b1b" />
               </View>
               <View style={styles.textContainer}>
                 <Text style={styles.menuTitle}>My Orders</Text>
                 <Text style={styles.menuSubtitle}>
-                  {isLoggedIn ? 'Recent order history, 10 orders...' : 'Login to view orders'}
+                  {isLoggedIn 
+                    ? orderCount > 0 
+                      ? `${orderCount} order${orderCount > 1 ? 's' : ''} placed` 
+                      : 'No orders placed yet'
+                    : 'Login to view your orders'}
                 </Text>
               </View>
             </View>

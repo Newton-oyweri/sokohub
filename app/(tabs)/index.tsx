@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
-  import { router } from "expo-router";
+import { router } from "expo-router";
 import {
   View,
   Text,
@@ -27,9 +26,15 @@ export default function App() {
   const [userName, setUserName] = useState('Guest User');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // 1. Animated value tracker for scroll management
+  // Notifications State & Animation Refs
+  const [unreadCount, setUnreadCount] = useState(0);
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const shakeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Animated value tracker for scroll management
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  // --- CORE AUTH LIFECYCLE ---
   useEffect(() => {
     checkUserSession();
 
@@ -37,10 +42,12 @@ export default function App() {
       if (session) {
         setIsLoggedIn(true);
         fetchProfileDetails(session.user.id);
+        fetchUnreadCount(session.user.id);
       } else {
         setIsLoggedIn(false);
         setUserName('Guest User');
         setAvatarUrl(null);
+        setUnreadCount(0);
       }
     });
 
@@ -54,6 +61,7 @@ export default function App() {
     if (session) {
       setIsLoggedIn(true);
       fetchProfileDetails(session.user.id);
+      fetchUnreadCount(session.user.id);
     }
   };
 
@@ -74,7 +82,109 @@ export default function App() {
     }
   };
 
-  // 2. Map the scroll position to an opacity scale (fades out completely over 80px of scrolling)
+  // --- NOTIFICATION LIFECYCLE MANAGEMENT ---
+
+  // 1. Fetch exact unread count
+  const fetchUnreadCount = async (userId: string) => {
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (!error && count !== null) {
+        setUnreadCount(count);
+      }
+    } catch (err) {
+      console.log('Error fetching unread count:', err);
+    }
+  };
+
+  // 2. Real-time Subscription management (Listeners attached BEFORE calling subscribe)
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupRealtime = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const userId = session.user.id;
+
+      channel = supabase
+        .channel(`realtime-unread-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            fetchUnreadCount(userId);
+          }
+        );
+
+      channel.subscribe();
+    };
+
+    if (isLoggedIn) {
+      setupRealtime();
+    }
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [isLoggedIn]);
+
+  // 3. Repeating Shake Animation Loop Logic
+  useEffect(() => {
+    if (shakeIntervalRef.current) {
+      clearInterval(shakeIntervalRef.current);
+      shakeIntervalRef.current = null;
+    }
+
+    if (unreadCount > 0) {
+      triggerBellShake();
+
+      // Loop the shake reminder every 4 seconds
+      shakeIntervalRef.current = setInterval(() => {
+        triggerBellShake();
+      }, 4000); 
+    } else {
+      shakeAnimation.setValue(0);
+    }
+
+    return () => {
+      if (shakeIntervalRef.current) {
+        clearInterval(shakeIntervalRef.current);
+      }
+    };
+  }, [unreadCount]);
+
+  const triggerBellShake = () => {
+    shakeAnimation.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0.6, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -0.6, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 45, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // Interpolate rotation values for the shaking visual effect
+  const bellRotation = shakeAnimation.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-15deg', '15deg'],
+  });
+
+  // Map the scroll position to an opacity scale
   const greetingOpacity = scrollY.interpolate({
     inputRange: [0, 80],
     outputRange: [1, 0],
@@ -89,7 +199,7 @@ export default function App() {
         <Header />
       </View>
 
-      {/* Main Scrollable Content - Changed to Animated.ScrollView */}
+      {/* Main Scrollable Content */}
       <Animated.ScrollView 
         style={StyleSheet.absoluteFillObject}
         contentContainerStyle={[styles.scrollContent, { paddingTop: STATUS_BAR_HEIGHT }]}
@@ -97,7 +207,7 @@ export default function App() {
         stickyHeaderIndices={[1]} 
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true } // Utilizes hardware acceleration for fluid performance
+          { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
       >
@@ -170,20 +280,23 @@ export default function App() {
         </View>
       </Animated.ScrollView>
 
-
-{/* Notification Bell */}
-<TouchableOpacity
-  style={[styles.fixedNotifIconContainer, { top: STATUS_BAR_HEIGHT + 12 }]}
-  activeOpacity={0.7}
-  onPress={() => router.push("/notifications")}
->
-  <Ionicons
-    name="notifications-outline"
-    size={24}
-    color="#1F2937"
-  />
-  <View style={styles.badgeIndicator} />
-</TouchableOpacity>
+      {/* Upgraded Animated Notification Bell Container */}
+      <TouchableOpacity
+        style={[styles.fixedNotifIconContainer, { top: STATUS_BAR_HEIGHT + 12 }]}
+        activeOpacity={0.7}
+        onPress={() => router.push("/notifications")}
+      >
+        <Animated.View style={{ transform: [{ rotate: bellRotation }] }}>
+          <Ionicons
+            name={unreadCount > 0 ? "notifications" : "notifications-outline"}
+            size={24}
+            color={unreadCount > 0 ? "#6b46c1" : "#1F2937"}
+          />
+        </Animated.View>
+        
+        {/* Conditional Indicator Dot */}
+        {unreadCount > 0 && <View style={styles.badgeIndicator} />}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -218,13 +331,11 @@ const styles = StyleSheet.create({
     color: '#6b46c1',
     fontWeight: '700',
   },
-  /* Upgraded Premium Sticky Navigation Layout */
   stickyTabsWrapper: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    /* Added padding to prevent overlapping with system components / statusbar */
-    paddingTop: Platform.OS === 'ios' ? 30 : 30, 
+    paddingTop: 30, 
     paddingBottom: 12,
     shadowColor: '#6b46c1',
     shadowOffset: { width: 0, height: -4 },
@@ -238,7 +349,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 20,
-    /* Ensuring clean separation layout structure below device barriers */
     marginTop: 4, 
   },
   tabButton: {
@@ -299,12 +409,12 @@ const styles = StyleSheet.create({
   },
   badgeIndicator: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 12,
+    right: 13,
     backgroundColor: '#EF4444',
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },

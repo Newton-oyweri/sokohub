@@ -35,6 +35,7 @@ export default function WeddingCakesContent() {
   
   const [cakes, setCakes] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchWeddingCakes();
@@ -46,10 +47,10 @@ export default function WeddingCakesContent() {
       
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, price, image_urls, post_type')
+        .select('id, name, description, price, image_urls, post_type, rating')
         .eq('category', 'cake')
         .eq('is_available', true)
-        .eq('post_type', 'booking')  // 🔥 ONLY show booking products
+        .eq('post_type', 'booking')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -60,7 +61,7 @@ export default function WeddingCakesContent() {
       if (data && data.length > 0) {
         const formattedData = data.map((item) => ({
           ...item,
-          rating: 5.0,
+          rating: item.rating || 0,
         }));
         setCakes(formattedData);
       } else {
@@ -70,6 +71,53 @@ export default function WeddingCakesContent() {
       console.error('Network or Initialization error fetching wedding cakes:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🔥 Handle heart tap - increment rating by 0.1
+  const handleHeartPress = async (productId: string, currentRating: number) => {
+    // Prevent multiple taps
+    if (likedProducts.has(productId)) {
+      return;
+    }
+
+    const newRating = Math.min(currentRating + 0.1, 10);
+
+    // Update UI immediately (optimistic update)
+    setCakes(prevProducts =>
+      prevProducts.map(product =>
+        product.id === productId
+          ? { ...product, rating: newRating }
+          : product
+      )
+    );
+
+    // Mark as liked
+    setLikedProducts(prev => new Set(prev).add(productId));
+
+    // Update in Supabase
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ rating: newRating })
+        .eq('id', productId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating rating:', error);
+      // Revert if error
+      setCakes(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId
+            ? { ...product, rating: currentRating }
+            : product
+        )
+      );
+      setLikedProducts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(productId);
+        return newSet;
+      });
     }
   };
 
@@ -91,6 +139,8 @@ export default function WeddingCakesContent() {
       : require('../../../assets/images/wedding.png');
 
     const formattedPrice = `From KSh ${Number(item.price).toLocaleString()}`;
+    const isLiked = likedProducts.has(item.id);
+    const displayRating = item.rating || 0;
 
     return (
       <Animated.View style={{ transform: [{ scale }] }}>
@@ -117,11 +167,14 @@ export default function WeddingCakesContent() {
                 {item.name}
               </Text>
 
-              <TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => handleHeartPress(item.id, displayRating)}
+                activeOpacity={0.7}
+              >
                 <Ionicons
-                  name="heart-outline"
+                  name={isLiked ? "heart" : "heart-outline"}
                   size={24}
-                  color="#64748b"
+                  color={isLiked ? "#ef4444" : "#64748b"}
                 />
               </TouchableOpacity>
             </View>
@@ -137,7 +190,7 @@ export default function WeddingCakesContent() {
                   size={18}
                   color="#fbbf24"
                 />
-                <Text style={styles.rating}>{item.rating ?? 5.0}</Text>
+                <Text style={styles.rating}>{displayRating.toFixed(1)} / 10</Text>
               </View>
             </View>
 
@@ -185,10 +238,12 @@ export default function WeddingCakesContent() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Occasion Designs</Text>
-        <Text style={styles.subtitle}>Custom cakes for your special day</Text>
-      </View>
+  <View style={styles.header}>
+  <Text style={styles.title}>Occasion Designs</Text>
+  <Text style={styles.subtitle}>
+    We've got you covered for birthdays, weddings, graduations & every celebration.
+  </Text>
+</View>
 
       <Animated.FlatList
         data={cakes}

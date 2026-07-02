@@ -47,7 +47,10 @@ export default function ProductGrid({ items }: ProductGridProps) {
       <TouchableOpacity 
         key={item.id}
         style={styles.itemCard}
-        onPress={() => router.push(`../review?id=${item.id}`)}
+        onPress={() => router.push({
+          pathname: '../review',
+          params: { id: item.id, post_type: item.post_type }
+        })}
         activeOpacity={0.9}
       >
         <Image 
@@ -64,7 +67,15 @@ export default function ProductGrid({ items }: ProductGridProps) {
             style={styles.smallOrderBtn}
             onPress={() => router.push({
               pathname: '../order',
-              params: { id: item.id }
+              params: { 
+                id: item.id,
+                name: item.name,
+                price: price.toString(),
+                seller_id: item.seller_id || '',
+                description: item.description || 'Delicious treat',
+                image_urls: JSON.stringify(item.image_urls || null),
+                post_type: item.post_type,
+              }
             })}
           >
             <Text style={styles.smallOrderBtnText}>Buy Now</Text>

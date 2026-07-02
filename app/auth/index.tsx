@@ -107,7 +107,9 @@ export default function AuthScreen() {
       if (error) throw error;
       
       await sendAuthSuccessNotification(false);
-      router.replace('/(tabs)');
+      
+      // Navigate back to previous screen or tabs
+      router.back();
       
     } catch (error: any) {
       Alert.alert('Login Failed', error.message);
@@ -143,7 +145,7 @@ export default function AuthScreen() {
 
       if (data.user) {
         await sendAuthSuccessNotification(true);
-        router.replace('/(tabs)');
+        router.back();
       }
     } catch (error: any) {
       Alert.alert('Sign Up Failed', error.message);

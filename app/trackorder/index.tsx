@@ -1,59 +1,171 @@
 // app/(tabs)/Account/AccountTabs/TrackOrder.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Linking,
-  Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 
-interface TrackOrderProps {
-  onBack: () => void;
-  orderId?: string;
+interface OrderDetails {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  quantity: number;
+  created_at: string;
+  customer_id: string;
+  seller_id: string;
+  delivery_person_id: string | null;
+  products?: {
+    name: string;
+    image_urls: string[];
+  };
 }
 
-// 4 Progressive Delivery Stages
-const TRACKING_STEPS = [
-  {
-    title: 'Order Confirmed',
-    description: 'We have received your payment & cake choice.',
-    icon: 'checkmark-circle-outline',
-  },
-  {
-    title: 'Baking & Preparing',
-    description: 'The kitchen is putting together your Red Velvet Magic.',
-    icon: 'flame-outline',
-  },
-  {
-    title: 'Out for Delivery',
-    description: 'Rider is en route to K.U. Main Campus.',
-    icon: 'bicycle-outline',
-  },
-  {
-    title: 'Delivered',
-    description: 'Enjoy your fresh cake!',
-    icon: 'gift-outline',
-  },
-];
-
-export default function TrackOrder({ onBack, orderId = 'ORD-7841' }: TrackOrderProps) {
-  const insets = useSafeAreaInsets();
-  
-  // Current step state (0 = Confirmed, 1 = Preparing, 2 = Out for Delivery, 3 = Delivered)
-  // Your backend will update this number dynamically over WebSockets or polling later
-  const [currentStep, setCurrentStep] = useState(1);
-
-  const riderName = 'Mwangi J.';
-  const riderPhone = '+254712345678'; 
-
-  const handleCallRider = () => {
-    Linking.openURL(`tel:${riderPhone}`);
+// Order status to tracking step mapping aligning with the backend array indices
+const getTrackingStep = (status: string): number => {
+  const stepMap: Record<string, number> = {
+    'pending': 0,
+    'accepted': 0,
+    'in_progress': 1,
+    'ready': 2,        // Baker sent it to delivery point
+    'pickup': 3,       // Awaiting pickup at destination
+    'delivered': 4,
+    'cancelled': -1,
   };
+  return stepMap[status] ?? 0;
+};
+
+// Get status display config for banners and badges
+const getStatusConfig = (status: string) => {
+  const statusMap: Record<string, { label: string; color: string; icon: string }> = {
+    pending: { label: 'Pending', color: '#f59e0b', icon: 'time-outline' },
+    accepted: { label: 'Accepted', color: '#3b82f6', icon: 'checkmark-circle-outline' },
+    in_progress: { label: 'In Progress', color: '#8b5cf6', icon: 'construct-outline' },
+    ready: { label: 'Dispatched', color: '#06b6d4', icon: 'paper-plane-outline' },
+    pickup: { label: 'Ready for Pickup', color: '#ec4899', icon: 'location-outline' },
+    delivered: { label: 'Delivered', color: '#10b981', icon: 'checkmark-done-outline' },
+    cancelled: { label: 'Cancelled', color: '#ef4444', icon: 'close-circle-outline' },
+  };
+  return statusMap[status] || { label: status, color: '#64748b', icon: 'help-outline' };
+};
+
+export default function TrackOrder({ onBack }: { onBack: () => void }) {
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [order, setOrder] = useState<OrderDetails | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+
+  useEffect(() => {
+    if (params.orderId) {
+      fetchOrderDetails(params.orderId as string);
+    }
+  }, [params.orderId]);
+
+  const fetchOrderDetails = async (orderId: string) => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          products (
+            name,
+            image_urls
+          )
+        `)
+        .eq('id', orderId)
+        .single();
+
+      if (error) throw error;
+      
+      setOrder(data);
+      const step = getTrackingStep(data.status);
+      setCurrentStep(step);
+
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      Alert.alert('Error', 'Failed to load order details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tracking steps with explicit context between Ready & Pickup
+  const getTrackingSteps = () => {
+    const productName = order?.products?.name || 'your order';
+    
+    return [
+      {
+        title: 'Order Confirmed',
+        description: `Your order for ${productName} has been confirmed.`,
+      },
+      {
+        title: 'Preparing',
+        description: `The baker is currently preparing your ${productName}.`,
+      },
+      {
+        title: 'Sent to Delivery Point',
+        description: `The vendor has completed your ${productName} and sent it to the delivery point.`,
+      },
+      {
+        title: 'Ready for Pickup',
+        description: `Your ${productName} has arrived and is awaiting pickup at your selected destination.`,
+      },
+      {
+        title: 'Delivered',
+        description: `Your ${productName} has been successfully picked up and delivered.`,
+      },
+    ];
+  };
+
+  const TRACKING_STEPS = getTrackingSteps();
+  const isCancelled = order?.status === 'cancelled';
+  const statusConfig = order ? getStatusConfig(order.status) : null;
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={26} color="#1f2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Track Order</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6b46c1" />
+          <Text style={styles.loadingText}>Loading order details...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={26} color="#1f2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Track Order</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#94a3b8" />
+          <Text style={styles.emptyText}>Order not found</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -64,7 +176,7 @@ export default function TrackOrder({ onBack, orderId = 'ORD-7841' }: TrackOrderP
         </TouchableOpacity>
         <View>
           <Text style={styles.headerTitle}>Track Order</Text>
-          <Text style={styles.headerSubtitle}>{orderId}</Text>
+          <Text style={styles.headerSubtitle}>{order.order_number}</Text>
         </View>
       </View>
 
@@ -72,107 +184,114 @@ export default function TrackOrder({ onBack, orderId = 'ORD-7841' }: TrackOrderP
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
       >
-        {/* Estimated Time Banner */}
-        <View style={styles.etaCard}>
-          <View style={styles.etaLeft}>
-            <Text style={styles.etaLabel}>Estimated Delivery</Text>
-            <Text style={styles.etaTime}>25 - 35 Mins</Text>
+        {/* Order Info Card */}
+        <View style={styles.orderInfoCard}>
+          <View style={styles.orderInfoRow}>
+            <Text style={styles.orderInfoLabel}>Product</Text>
+            <Text style={styles.orderInfoValue}>{order.products?.name || 'Unknown'}</Text>
           </View>
-          <View style={styles.etaBadge}>
-            <Ionicons name="time" size={20} color="#6b46c1" />
+          <View style={styles.orderInfoRow}>
+            <Text style={styles.orderInfoLabel}>Quantity</Text>
+            <Text style={styles.orderInfoValue}>x{order.quantity}</Text>
+          </View>
+          <View style={styles.orderInfoRow}>
+            <Text style={styles.orderInfoLabel}>Total</Text>
+            <Text style={styles.orderInfoValue}>KSh {order.total_amount}</Text>
+          </View>
+          <View style={styles.orderInfoRow}>
+            <Text style={styles.orderInfoLabel}>Status</Text>
+            <View style={styles.statusBadge}>
+              <Ionicons name={statusConfig?.icon as any} size={14} color={statusConfig?.color} />
+              <Text style={[styles.orderInfoValue, { color: statusConfig?.color, marginLeft: 6 }]}>
+                {statusConfig?.label}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.orderInfoRow}>
+            <Text style={styles.orderInfoLabel}>Order Date</Text>
+            <Text style={styles.orderInfoValue}>
+              {new Date(order.created_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </Text>
           </View>
         </View>
 
-        {/* PROGRESSIVE TIMELINE FLOW */}
-        <View style={styles.timelineCard}>
-          <Text style={styles.cardTitle}>Delivery Status</Text>
+        {isCancelled ? (
+          <View style={styles.cancelledCard}>
+            <Ionicons name="close-circle" size={48} color="#ef4444" />
+            <Text style={styles.cancelledTitle}>Order Cancelled</Text>
+            <Text style={styles.cancelledDescription}>
+              This order has been cancelled. Please contact support if you have any questions.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Current Status Banner */}
+            <View style={[styles.statusBanner, { backgroundColor: `${statusConfig?.color}10` }]}>
+              <Ionicons name={statusConfig?.icon as any} size={24} color={statusConfig?.color} />
+              <Text style={[styles.statusBannerText, { color: statusConfig?.color }]}>
+                Current Status: {statusConfig?.label}
+              </Text>
+            </View>
 
-          {TRACKING_STEPS.map((step, index) => {
-            const isDone = index <= currentStep;
-            const isCurrent = index === currentStep;
-            const isLast = index === TRACKING_STEPS.length - 1;
+            {/* PROGRESSIVE TIMELINE FLOW */}
+            <View style={styles.timelineCard}>
+              <Text style={styles.cardTitle}>Order Progress</Text>
 
-            return (
-              <View key={index} style={styles.stepRow}>
-                {/* Visual Indicator (Node Dot & Connector Line) */}
-                <View style={styles.indicatorColumn}>
-                  <View style={[
-                    styles.statusDot,
-                    isDone ? styles.dotCompleted : styles.dotPending,
-                    isCurrent && styles.dotCurrentActive
-                  ]}>
-                    {isDone && <Ionicons name="checkmark" size={12} color="#fff" />}
+              {TRACKING_STEPS.map((step, index) => {
+                const isDone = index <= currentStep;
+                const isCurrent = index === currentStep;
+                const isLast = index === TRACKING_STEPS.length - 1;
+
+                return (
+                  <View key={index} style={styles.stepRow}>
+                    {/* Visual Indicator (Node Dot & Connector Line) */}
+                    <View style={styles.indicatorColumn}>
+                      <View style={[
+                        styles.statusDot,
+                        isDone ? styles.dotCompleted : styles.dotPending,
+                        isCurrent && styles.dotCurrentActive
+                      ]}>
+                        {isDone && <Ionicons name="checkmark" size={12} color="#fff" />}
+                      </View>
+                      {!isLast && (
+                        <View style={[
+                          styles.connectorLine,
+                          index < currentStep ? styles.lineCompleted : styles.linePending
+                        ]} />
+                      )}
+                    </View>
+
+                    {/* Step Metadata text */}
+                    <View style={styles.stepTextDetails}>
+                      <Text style={[
+                        styles.stepTitle,
+                        isDone ? styles.textCompleted : styles.textPending,
+                        isCurrent && styles.textCurrent
+                      ]}>
+                        {step.title}
+                      </Text>
+                      <Text style={styles.stepDescription}>
+                        {step.description}
+                      </Text>
+                    </View>
                   </View>
-                  {!isLast && (
-                    <View style={[
-                      styles.connectorLine,
-                      index < currentStep ? styles.lineCompleted : styles.linePending
-                    ]} />
-                  )}
-                </View>
-
-                {/* Step Metadata text */}
-                <View style={styles.stepTextDetails}>
-                  <Text style={[
-                    styles.stepTitle,
-                    isDone ? styles.textCompleted : styles.textPending,
-                    isCurrent && styles.textCurrent
-                  ]}>
-                    {step.title}
-                  </Text>
-                  <Text style={styles.stepDescription}>
-                    {step.description}
-                  </Text>
-                </View>
-
-                {/* Floating Aspect Context Icon */}
-                <Ionicons 
-                  name={step.icon as any} 
-                  size={22} 
-                  color={isDone ? '#6b46c1' : '#cbd5e1'} 
-                  style={styles.stepSideIcon}
-                />
-              </View>
-            );
-          })}
-        </View>
-
-        {/* RIDER ASSIGNMENT CARD */}
-        {currentStep >= 2 && (
-          <View style={styles.riderCard}>
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={28} color="#6b46c1" />
+                );
+              })}
             </View>
-            <View style={styles.riderInfo}>
-              <Text style={styles.assignedLabel}>Your Delivery Rider</Text>
-              <Text style={styles.riderName}>{riderName}</Text>
+
+            {/* Order Reference */}
+            <View style={styles.referenceCard}>
+              <Text style={styles.referenceLabel}>Order Reference</Text>
+              <Text style={styles.referenceValue}>{order.order_number}</Text>
             </View>
-            <TouchableOpacity style={styles.callButton} onPress={handleCallRider}>
-              <Ionicons name="call" size={20} color="#fff" />
-              <Text style={styles.callButtonText}>Call</Text>
-            </TouchableOpacity>
-          </View>
+          </>
         )}
-
-        {/* DEMO DEBUG CONTROLLER BUTTON (For backend preview mapping testing) */}
-        <View style={styles.devControls}>
-          <Text style={styles.devTitle}>Dev Testing Controls</Text>
-          <View style={styles.devBtnGroup}>
-            <TouchableOpacity 
-              style={styles.devBtn} 
-              onPress={() => setCurrentStep(prev => Math.max(0, prev - 1))}
-            >
-              <Text style={styles.devBtnText}>Prev Step</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.devBtn} 
-              onPress={() => setCurrentStep(prev => Math.min(3, prev + 1))}
-            >
-              <Text style={styles.devBtnText}>Next Step</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
       </ScrollView>
     </View>
   );
@@ -211,13 +330,31 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
-  etaCard: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  orderInfoCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -225,29 +362,64 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  etaLeft: {
-    flex: 1,
+  orderInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  etaLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  orderInfoLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
   },
-  etaTime: {
-    fontSize: 26,
-    fontWeight: '800',
+  orderInfoValue: {
+    fontSize: 14,
     color: '#1f2937',
-    marginTop: 4,
+    fontWeight: '600',
   },
-  etaBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#f3e8ff',
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  statusBannerText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cancelledCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cancelledTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ef4444',
+    marginTop: 12,
+  },
+  cancelledDescription: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
   },
   timelineCard: {
     backgroundColor: '#fff',
@@ -331,91 +503,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 18,
   },
-  stepSideIcon: {
-    marginLeft: 8,
-    opacity: 0.8,
-  },
-  riderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+  referenceCard: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 16,
     padding: 16,
-    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    marginBottom: 16,
   },
-  avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e0d9ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  riderInfo: {
-    flex: 1,
-  },
-  assignedLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
+  referenceLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  riderName: {
+  referenceValue: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1f2937',
-    marginTop: 2,
-  },
-  callButton: {
-    flexDirection: 'row',
-    backgroundColor: '#10b981',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  callButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-    marginLeft: 6,
-  },
-  devControls: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderStyle: 'dashed',
-  },
-  devTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  devBtnGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  devBtn: {
-    backgroundColor: '#fff',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  devBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    marginTop: 4,
   },
 });

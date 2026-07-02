@@ -1,20 +1,19 @@
-import React, { useRef, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
-import Market from './MarketSection';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import BookCake from './BookCake';
+import Market from './MarketSection';
+import SkeletonLoader from './SkeletonLoader'; // Import your skeleton loader
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.78;
@@ -23,12 +22,12 @@ const ITEM_WIDTH = CARD_WIDTH + SPACING * 2;
 
 interface Product {
   id: string;
+  seller_id:string;
   name: string;
   description: string | null;
   price: number;
   image_urls: string[] | null;
   post_type: 'sale' | 'booking' | 'pinned';
-  rating: number; // Changed to required number with default 0
   sold?: string;
 }
 
@@ -38,7 +37,6 @@ export default function CakesContent() {
   
   const [pinnedProducts, setPinnedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchPinnedProducts();
@@ -50,7 +48,7 @@ export default function CakesContent() {
       
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, price, image_urls, post_type, rating')
+        .select('id, seller_id, name, description, price, image_urls, post_type')
         .eq('is_available', true)
         .eq('post_type', 'pinned')
         .order('created_at', { ascending: false });
@@ -62,10 +60,16 @@ export default function CakesContent() {
 
       if (data && data.length > 0) {
         const formattedData = data.map((item) => ({
-          ...item,
-          rating: item.rating || 0, // Use actual rating from DB, default 0
+          // ensure required Product fields exist; provide sensible defaults
+          id: item.id,
+          seller_id: item.seller_id ?? '',
+          name: item.name,
+          description: item.description ?? null,
+          price: item.price ?? 0,
+          image_urls: item.image_urls ?? null,
+          post_type: item.post_type ?? 'pinned',
           sold: `${Math.floor(Math.random() * 5) + 1}k`,
-        }));
+        } as Product));
         setPinnedProducts(formattedData);
       } else {
         console.warn("No pinned products found.");
@@ -78,52 +82,36 @@ export default function CakesContent() {
     }
   };
 
-  // 🔥 Function to increment rating when liked
-  const handleLike = async (productId: string, currentRating: number) => {
-    // Prevent spam clicking
-    if (likedProducts.has(productId)) {
-      Alert.alert('Already Liked!', 'You already liked this product ❤️');
-      return;
-    }
-
-    try {
-      // Calculate new rating (cap at 10)
-      const newRating = Math.min(currentRating + 0.1, 10);
-
-      // Update in Supabase
-      const { error } = await supabase
-        .from('products')
-        .update({ rating: newRating })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      // Update local state
-      setPinnedProducts(prevProducts =>
-        prevProducts.map(product =>
-          product.id === productId
-            ? { ...product, rating: newRating }
-            : product
-        )
-      );
-
-      // Mark as liked
-      setLikedProducts(prev => new Set(prev).add(productId));
-
-      // Show feedback (optional)
-      Alert.alert('❤️ Loved!', `Rating increased to ${newRating.toFixed(1)}`);
-
-    } catch (error) {
-      console.error('Error updating rating:', error);
-      Alert.alert('Error', 'Failed to update rating. Please try again.');
-    }
-  };
-
   const getProductImage = (item: Product) => {
     if (item.image_urls && item.image_urls.length > 0) {
       return { uri: item.image_urls[0] };
     }
     return require('../../../assets/images/cake.png');
+  };
+
+  // 🔥 Skeleton Loader for Cards
+  const renderSkeleton = () => {
+    return (
+      <View style={styles.skeletonContainer}>
+        {[1, 2, 3].map((_, index) => (
+          <View key={index} style={[styles.card, styles.skeletonCard]}>
+            <View style={styles.imageContainer}>
+              <SkeletonLoader style={styles.skeletonImage} />
+            </View>
+            <View style={styles.details}>
+              <View style={styles.headerRow}>
+                <SkeletonLoader style={styles.skeletonTitle} />
+              </View>
+              <SkeletonLoader style={styles.skeletonDescription} />
+              <View style={styles.priceRow}>
+                <SkeletonLoader style={styles.skeletonPrice} />
+                <SkeletonLoader style={styles.skeletonButton} />
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   const renderPinnedProduct = ({ item, index }: { item: Product; index: number }) => {
@@ -141,8 +129,6 @@ export default function CakesContent() {
 
     const imageSource = getProductImage(item);
     const formattedPrice = `KSh ${Number(item.price).toLocaleString()}`;
-    const isLiked = likedProducts.has(item.id);
-    const displayRating = item.rating || 0;
 
     return (
       <Animated.View style={[{ transform: [{ scale }] }]}>
@@ -161,12 +147,6 @@ export default function CakesContent() {
               resizeMode="cover" 
             />
             <View style={styles.imageOverlay} />
-            
-            {/* 🔥 Pinned Badge */}
-            <View style={styles.badgeContainer}>
-              <Ionicons name="pin" size={14} color="#fff" />
-              <Text style={styles.badgeText}>PINNED</Text>
-            </View>
           </View>
 
           <View style={styles.details}>
@@ -174,47 +154,31 @@ export default function CakesContent() {
               <Text style={styles.productName} numberOfLines={1}>
                 {item.name}
               </Text>
-              
-              {/* ❤️ Heart Button with Rating */}
-              <TouchableOpacity 
-                onPress={() => handleLike(item.id, displayRating)}
-                activeOpacity={0.7}
-                style={styles.heartButton}
-              >
-                <Ionicons 
-                  name={isLiked ? "heart" : "heart-outline"} 
-                  size={24} 
-                  color={isLiked ? "#ef4444" : "#64748b"} 
-                />
-              </TouchableOpacity>
             </View>
 
             <Text style={styles.description} numberOfLines={2}>
               {item.description || 'No description available.'}
             </Text>
 
-            <View style={styles.metaRow}>
-              <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={18} color="#fbbf24" />
-                <Text style={styles.rating}>{displayRating.toFixed(1)}</Text>
-                <Text style={styles.ratingLabel}>/ 10</Text>
-              </View>
-              <Text style={styles.engagementText}>
-                {Math.round(displayRating * 10)} engagements
-              </Text>
-            </View>
-
             <View style={styles.priceRow}>
               <Text style={styles.price}>{formattedPrice}</Text>
-              <TouchableOpacity
-                style={styles.orderButton}
-                onPress={() => router.push({
-                  pathname: '../order',
-                  params: { id: item.id }
-                })}
-              >
-                <Text style={styles.orderButtonText}>Quick Order</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.orderButton}
+                  onPress={() => router.push({
+                    pathname: '../order',
+                    params: { 
+                      id: item.id,
+                      name: item.name,
+                      price: item.price.toString(),
+                      seller_id: item.seller_id,
+                      description: item.description || 'Delicious treat',
+                      image_urls: JSON.stringify(item.image_urls),
+                      post_type: item.post_type,
+                    }
+                  })}
+                >
+                  <Text style={styles.orderButtonText}>Quick Order</Text>
+                </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
@@ -222,23 +186,19 @@ export default function CakesContent() {
     );
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', minHeight: 300 }]}>
-        <ActivityIndicator size="large" color="#6b46c1" />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Weekly Specials</Text>
-        <Text style={styles.subtitle}>❤️ Like to boost ratings!</Text>
-      </View>
+    <View style={styles.header}>
+  <Text style={styles.title}>Weekly Specials</Text>
+  <Text style={styles.subtitle}>
+    Fresh picks, exclusive deals, and customer favorites this week.
+  </Text>
+</View>
 
-      {pinnedProducts.length === 0 ? (
+      {loading ? (
+        // 🔥 Skeleton Loader
+        renderSkeleton()
+      ) : pinnedProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="pin-outline" size={64} color="#cbd5e1" />
           <Text style={styles.emptyTitle}>No Pinned Items</Text>
@@ -318,26 +278,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
   },
-  badgeContainer: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(239, 68, 68, 0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
   details: { 
     padding: 18 
   },
@@ -354,46 +294,19 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
-  heartButton: {
-    padding: 4,
-  },
   description: {
     fontSize: 14.5,
     color: '#64748b',
     lineHeight: 21,
     marginBottom: 12,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  rating: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#1e293b' 
-  },
-  ratingLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: '500',
-  },
-  engagementText: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-  },
   priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 8,
+},
   price: {
     fontSize: 26,
     fontWeight: '800',
@@ -427,5 +340,46 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginTop: 4,
     textAlign: 'center',
+  },
+  // 🔥 Skeleton Styles
+  skeletonContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: (width - CARD_WIDTH) / 2,
+    paddingVertical: 10,
+    gap: 20,
+  },
+  skeletonCard: {
+    opacity: 0.8,
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 235,
+    borderRadius: 28,
+  },
+  skeletonTitle: {
+    width: 120,
+    height: 20,
+    borderRadius: 4,
+  },
+  skeletonHeart: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  skeletonDescription: {
+    width: '100%',
+    height: 40,
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  skeletonPrice: {
+    width: 80,
+    height: 26,
+    borderRadius: 4,
+  },
+  skeletonButton: {
+    width: 100,
+    height: 44,
+    borderRadius: 16,
   },
 });
