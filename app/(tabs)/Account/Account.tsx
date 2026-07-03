@@ -202,17 +202,10 @@ export default function AccountContent() {
     }
   };
 
+  // Subview interception remains unchanged
   if (currentView === 'profile') return <UserProfile onBack={handleBackToMenu} />;
   if (currentView === 'wallet') return <Wallet onBack={handleBackToMenu} />;
   if (currentView === 'orders') return <MyOrders onBack={handleBackToMenu} />;
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading your account...</Text>
-      </View>
-    );
-  }
 
   return (
     <>
@@ -226,7 +219,7 @@ export default function AccountContent() {
       >
         <View style={styles.menuContainer}>
 
-          {/* route to games page */}
+          {/* Games Card renders immediately here */}
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
@@ -246,113 +239,122 @@ export default function AccountContent() {
             <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
           </TouchableOpacity>
 
-          {/* Profile Row */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={handleProfilePress}
-          >
-            <View style={styles.menuLeftContent}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={[styles.iconContainer, { backgroundColor: '#c4b5fd' }]}>
-                  <Ionicons name="person-outline" size={28} color="#6b46c1" />
+          {/* Conditional layout for remaining components based on the loading state */}
+          {loading ? (
+            <View style={styles.inlineLoadingContainer}>
+              <Text style={styles.loadingText}>Loading your account...</Text>
+            </View>
+          ) : (
+            <>
+              {/* Profile Row */}
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={handleProfilePress}
+              >
+                <View style={styles.menuLeftContent}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={[styles.iconContainer, { backgroundColor: '#c4b5fd' }]}>
+                      <Ionicons name="person-outline" size={28} color="#6b46c1" />
+                    </View>
+                  )}
+
+                  <View style={styles.textContainer}>
+                    <Text style={styles.menuTitle}>{userName}</Text>
+                    <Text style={styles.menuSubtitle}>
+                      {isLoggedIn ? userEmail : 'Sign in to personalize your experience'}
+                    </Text>
+                  </View>
                 </View>
-              )}
+                <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+              </TouchableOpacity>
 
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>{userName}</Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn ? userEmail : 'Sign in to personalize your experience'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              {/* Wallet Row */}
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={handleWalletPress}
+              >
+                <View style={styles.menuLeftContent}>
+                  <View style={[styles.iconContainer, { backgroundColor: '#a5f3fc' }]}>
+                    <Ionicons name="wallet-outline" size={28} color="#155e75" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={styles.menuTitle}>My Wallet</Text>
+                    <Text style={styles.menuSubtitle}>
+                      {isLoggedIn 
+                        ? `KSh ${walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}` 
+                        : 'Login to view wallet'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+              </TouchableOpacity>
 
-          {/* Wallet Row */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={handleWalletPress}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#a5f3fc' }]}>
-                <Ionicons name="wallet-outline" size={28} color="#155e75" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>My Wallet</Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn 
-                    ? `KSh ${walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}` 
-                    : 'Login to view wallet'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              {/* My Orders Row */}
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={handleOrdersPress}
+              >
+                <View style={styles.menuLeftContent}>
+                  <View style={[styles.iconContainer, { backgroundColor: '#fecaca' }]}>
+                    <Ionicons name="receipt-outline" size={28} color="#991b1b" />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={styles.menuTitle}>My Orders</Text>
+                    <Text style={styles.menuSubtitle}>
+                      {isLoggedIn 
+                        ? orderCount > 0 
+                          ? `${orderCount} order${orderCount > 1 ? 's' : ''} placed` 
+                          : 'No orders placed yet'
+                        : 'Login to view your orders'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+              </TouchableOpacity>
 
-          {/* My Orders Row */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={handleOrdersPress}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#fecaca' }]}>
-                <Ionicons name="receipt-outline" size={28} color="#991b1b" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>My Orders</Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn 
-                    ? orderCount > 0 
-                      ? `${orderCount} order${orderCount > 1 ? 's' : ''} placed` 
-                      : 'No orders placed yet'
-                    : 'Login to view your orders'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              <View style={styles.spacer} />
 
-          <View style={styles.spacer} />
-
-          {/* Login / Logout Button Row */}
-          <TouchableOpacity
-            style={[
-              styles.menuItem,
-              isLoggedIn ? styles.logoutItem : styles.loginItem,
-            ]}
-            activeOpacity={0.7}
-            onPress={handleAuthAction}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[
-                styles.iconContainer,
-                isLoggedIn ? { backgroundColor: '#fee2e2' } : { backgroundColor: '#dbeafe' }
-              ]}>
-                <Ionicons
-                  name={isLoggedIn ? "log-out-outline" : "log-in-outline"}
-                  size={28}
-                  color={isLoggedIn ? "#dc2626" : "#2563eb"}
-                />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[
-                  styles.menuTitle,
-                  isLoggedIn ? styles.logoutText : styles.loginText
-                ]}>
-                  {isLoggedIn ? 'Logout' : 'Login / Sign Up'}
-                </Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn ? 'Sign out of your account' : 'Access your orders and wallet'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              {/* Login / Logout Button Row */}
+              <TouchableOpacity
+                style={[
+                  styles.menuItem,
+                  isLoggedIn ? styles.logoutItem : styles.loginItem,
+                ]}
+                activeOpacity={0.7}
+                onPress={handleAuthAction}
+              >
+                <View style={styles.menuLeftContent}>
+                  <View style={[
+                    styles.iconContainer,
+                    isLoggedIn ? { backgroundColor: '#fee2e2' } : { backgroundColor: '#dbeafe' }
+                  ]}>
+                    <Ionicons
+                      name={isLoggedIn ? "log-out-outline" : "log-in-outline"}
+                      size={28}
+                      color={isLoggedIn ? "#dc2626" : "#2563eb"}
+                    />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={[
+                      styles.menuTitle,
+                      isLoggedIn ? styles.logoutText : styles.loginText
+                    ]}>
+                      {isLoggedIn ? 'Logout' : 'Login / Sign Up'}
+                    </Text>
+                    <Text style={styles.menuSubtitle}>
+                      {isLoggedIn ? 'Sign out of your account' : 'Access your orders and wallet'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+              </TouchableOpacity>
+            </>
+          )}
 
           <View style={styles.bottomPadding} />
         </View>
@@ -374,11 +376,10 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1, backgroundColor: '#f9fafb' },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
   menuContainer: { padding: 16, paddingTop: 20 },
-  loadingContainer: {
-    flex: 1,
+  inlineLoadingContainer: {
+    paddingVertical: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
   },
   loadingText: { fontSize: 16, color: '#6b7280' },
   menuItem: {

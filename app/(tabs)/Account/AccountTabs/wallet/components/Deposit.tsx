@@ -183,6 +183,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   );
 };
 
+export default DepositModal;
+
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,

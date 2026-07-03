@@ -44,11 +44,6 @@
         }
       ]
     },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/notification-icon.png"
-    },
     "plugins": [
       "expo-router",
       "expo-font",
@@ -64,12 +59,15 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#6b46c1"
+          "color": "#6b46c1",
+          "sounds": [
+            "./assets/audio/notification_sound.wav"
+          ]
         }
       ],
-      "expo-web-browser",
       "expo-dev-client",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

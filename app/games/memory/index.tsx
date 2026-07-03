@@ -9,6 +9,10 @@ import {
 import * as NavigationBar from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { Audio } from "expo-av";
+import LottieView from 'lottie-react-native';
+
+// Import your Aeroplane.json
+import Aeroplane from "./assets/Aeroplane.json";
 
 const { width, height } = Dimensions.get("window");
 
@@ -42,7 +46,6 @@ const AUDIO_CONFIG = {
 // 🎨 VISUAL CONFIGURATION - Easy to adjust!
 // ============================================
 const VISUAL_CONFIG = {
-  CLUB_COLORS: ["#2ecc71", "#9b59b6", "#e74c3c", "#f1c40f", "#3498db", "#e84393"],
   BEAT_PULSE_FRAMES: 25, // Lower = faster pulse, Higher = slower pulse
 };
 
@@ -77,32 +80,32 @@ const LYRICS_TIMELINE = [
   { time: 84, text: "💖 Your heart for takeaway" },
   { time: 87, text: "🎵 Your heart for takeaway" },
   { time: 92, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
-  { time: 97, text: "🌌 Fate fate fate, is that what came between us?" },
-  { time: 101, text: "🤷 Or did we do this on our own?" },
-  { time: 106, text: "❓ So how did we get here?" },
-  { time: 109, text: "🤔 I'm asking myself why I'm so caught up" },
-  { time: 112, text: "🏃 Better if we do this on our own" },
-  { time: 115, text: "💔 Before I love you, na na na" },
-  { time: 118, text: "🚶 I'm gonna leave you, na na na" },
-  { time: 120, text: "🛡️ Before I'm someone you leave behind" },
-  { time: 123, text: "💥 I'll break your heart so you don't break mine" },
-  { time: 125, text: "💔 Before I love you, na na na" },
-  { time: 128, text: "🚶 I'm gonna leave you, na na na" },
-  { time: 130, text: "💖 Even if I'm not here to stay, I still want your heart" },
-  { time: 134, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
-  { time: 139, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
-  { time: 144, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
-  { time: 149, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
-  { time: 154, text: "💖 Your heart for takeaway" },
-  { time: 157, text: "🎵 Your heart for takeaway" },
-  { time: 162, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
-  { time: 167, text: "💔 Before I love you, na na na" },
-  { time: 170, text: "🚶 I'm gonna leave you, na na na" },
-  { time: 172, text: "🛡️ Before I'm someone you leave behind" },
-  { time: 175, text: "💥 I'll break your heart so you don't break mine" },
-  { time: 177, text: "💔 Before I love you, na na na" },
-  { time: 180, text: "🚶 I'm gonna leave you, na na na" },
-  { time: 182, text: "💖 Even if I'm not here to stay, I still want your heart" },
+  { time: 107, text: "🌌 Fate fate fate, is that what came between us?" },
+{ time: 111, text: "🤷 Or did we do this on our own?" },
+{ time: 116, text: "❓ So how did we get here?" },
+{ time: 119, text: "🤔 I'm asking myself why I'm so caught up" },
+{ time: 122, text: "🏃 Better if we do this on our own" },
+{ time: 125, text: "💔 Before I love you, na na na" },
+{ time: 128, text: "🚶 I'm gonna leave you, na na na" },
+{ time: 130, text: "🛡️ Before I'm someone you leave behind" },
+{ time: 133, text: "💥 I'll break your heart so you don't break mine" },
+{ time: 135, text: "💔 Before I love you, na na na" },
+{ time: 138, text: "🚶 I'm gonna leave you, na na na" },
+{ time: 140, text: "💖 Even if I'm not here to stay, I still want your heart" },
+{ time: 144, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
+{ time: 149, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
+{ time: 154, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
+{ time: 159, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
+{ time: 164, text: "💖 Your heart for takeaway" },
+{ time: 167, text: "🎵 Your heart for takeaway" },
+{ time: 172, text: "🎵 Your heart for takeaway, yeah yeah yeah yeah" },
+{ time: 177, text: "💔 Before I love you, na na na" },
+{ time: 180, text: "🚶 I'm gonna leave you, na na na" },
+{ time: 182, text: "🛡️ Before I'm someone you leave behind" },
+{ time: 185, text: "💥 I'll break your heart so you don't break mine" },
+{ time: 187, text: "💔 Before I love you, na na na" },
+{ time: 190, text: "🚶 I'm gonna leave you, na na na" },
+{ time: 192, text: "💖 Even if I'm not here to stay, I still want your heart" },
 ];
 
 // ============================================
@@ -118,14 +121,18 @@ export default function GameScreen() {
   
   // Rhythmic States
   const [beatPulse, setBeatPulse] = useState(false);
-  const [colorIndex, setColorIndex] = useState(0);
 
   // Audio Syncing States
   const [songSeconds, setSongSeconds] = useState(0);
   const [currentLyric, setCurrentLyric] = useState(LYRICS_TIMELINE[0].text);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const successSoundRef = useRef<Audio.Sound | null>(null);
+  const lostSoundRef = useRef<Audio.Sound | null>(null);
   const [isSoundLoaded, setIsSoundLoaded] = useState(false);
+  const [isSuccessSoundLoaded, setIsSuccessSoundLoaded] = useState(false);
+  const [isLostSoundLoaded, setIsLostSoundLoaded] = useState(false);
   const isMountedRef = useRef(true);
+  const prevScoreRef = useRef(0);
 
   // Immersive Fullscreen
   useEffect(() => {
@@ -137,23 +144,43 @@ export default function GameScreen() {
     return () => { NavigationBar.setVisibilityAsync("visible"); };
   }, []);
 
-  // 🎵 LOAD AUDIO
+  // 🎵 LOAD ALL AUDIO
   useEffect(() => {
     let soundObject: Audio.Sound | null = null;
+    let successSound: Audio.Sound | null = null;
+    let lostSound: Audio.Sound | null = null;
 
     async function loadAudio() {
       try {
+        // Load main music
         const { sound: playbackObject } = await Audio.Sound.createAsync(
           require("./assets/takeaway.mp3"),
           { shouldPlay: false, isLooping: AUDIO_CONFIG.LOOP }
         );
-        
         soundObject = playbackObject;
         soundRef.current = playbackObject;
         setIsSoundLoaded(true);
-        
+
+        // Load success sound
+        const { sound: success } = await Audio.Sound.createAsync(
+          require("./assets/success.mp3"),
+          { shouldPlay: false }
+        );
+        successSound = success;
+        successSoundRef.current = success;
+        setIsSuccessSoundLoaded(true);
+
+        // Load lost sound
+        const { sound: lost } = await Audio.Sound.createAsync(
+          require("./assets/lost.mp3"),
+          { shouldPlay: false }
+        );
+        lostSound = lost;
+        lostSoundRef.current = lost;
+        setIsLostSoundLoaded(true);
+
       } catch (error) {
-        console.log("Error loading audio asset file:", error);
+        console.log("Error loading audio assets:", error);
       }
     }
 
@@ -163,6 +190,12 @@ export default function GameScreen() {
       isMountedRef.current = false;
       if (soundObject) {
         soundObject.unloadAsync();
+      }
+      if (successSound) {
+        successSound.unloadAsync();
+      }
+      if (lostSound) {
+        lostSound.unloadAsync();
       }
     };
   }, []);
@@ -246,6 +279,43 @@ export default function GameScreen() {
     handleGameOverMusic();
   }, [gameOver]);
 
+  // 🎵 Play success sound when score increases
+  useEffect(() => {
+    async function playSuccessSound() {
+      if (score > prevScoreRef.current && isSuccessSoundLoaded && successSoundRef.current) {
+        try {
+          const status = await successSoundRef.current.getStatusAsync();
+          if (status.isLoaded) {
+            await successSoundRef.current.setPositionAsync(0);
+            await successSoundRef.current.playAsync();
+          }
+        } catch (error) {
+          console.log("Error playing success sound:", error);
+        }
+      }
+      prevScoreRef.current = score;
+    }
+    playSuccessSound();
+  }, [score, isSuccessSoundLoaded]);
+
+  // 🎵 Play lost sound when game over
+  useEffect(() => {
+    async function playLostSound() {
+      if (gameOver && isLostSoundLoaded && lostSoundRef.current) {
+        try {
+          const status = await lostSoundRef.current.getStatusAsync();
+          if (status.isLoaded) {
+            await lostSoundRef.current.setPositionAsync(0);
+            await lostSoundRef.current.playAsync();
+          }
+        } catch (error) {
+          console.log("Error playing lost sound:", error);
+        }
+      }
+    }
+    playLostSound();
+  }, [gameOver, isLostSoundLoaded]);
+
   // Main Game Loop
   useEffect(() => {
     if (gameOver) return;
@@ -258,7 +328,6 @@ export default function GameScreen() {
       frameCount++;
       if (frameCount % VISUAL_CONFIG.BEAT_PULSE_FRAMES === 0) {
         setBeatPulse((p) => !p);
-        setColorIndex((prevIndex) => (prevIndex + 1) % VISUAL_CONFIG.CLUB_COLORS.length);
       }
 
       setPipeX((x) => {
@@ -293,8 +362,8 @@ export default function GameScreen() {
     setPipeX(width);
     setGapY(height / 2);
     setScore(0);
+    prevScoreRef.current = 0;
     setGameOver(false);
-    setColorIndex(0);
     setSongSeconds(0);
     setCurrentLyric(LYRICS_TIMELINE[0].text);
     
@@ -313,8 +382,6 @@ export default function GameScreen() {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
-  const dynamicPipeColor = VISUAL_CONFIG.CLUB_COLORS[colorIndex];
 
   return (
     <>
@@ -336,10 +403,17 @@ export default function GameScreen() {
           </Text>
         </View>
 
-        <View style={[styles.pipe, { left: pipeX, height: gapY - GAME_CONFIG.GAP / 2, top: 0, backgroundColor: dynamicPipeColor }]} />
-        <View style={[styles.pipe, { left: pipeX, top: gapY + GAME_CONFIG.GAP / 2, height: height, backgroundColor: dynamicPipeColor }]} />
+        <View style={[styles.pipe, { left: pipeX, height: gapY - GAME_CONFIG.GAP / 2, top: 0 }]} />
+        <View style={[styles.pipe, { left: pipeX, top: gapY + GAME_CONFIG.GAP / 2, height: height }]} />
 
-        <Text style={[styles.plane, { top: planeY }]}>✈️</Text>
+        {/* Replaced the plane emoji with Aeroplane.json using LottieView */}
+        <LottieView
+          source={Aeroplane}
+          style={[styles.plane, { top: planeY }]}
+          autoPlay
+          loop
+          speed={1}
+        />
 
         {gameOver && (
           <View style={styles.overlay}>
@@ -351,7 +425,7 @@ export default function GameScreen() {
               </Text>
             </Pressable>
           </View>
-        )}
+        )} 
       </Pressable>
     </>
   );
@@ -360,8 +434,14 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#87CEEB" },
   score: { marginTop: 60, alignSelf: "center", fontSize: 22, fontWeight: "bold", color: "#fff", zIndex: 10, textShadowColor: "rgba(0, 0, 0, 0.3)", textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
-  plane: { position: "absolute", left: 50, fontSize: 45, zIndex: 5 },
-  pipe: { position: "absolute", width: GAME_CONFIG.PIPE_WIDTH, zIndex: 2, borderRadius: 8, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
+  plane: { 
+    position: "absolute", 
+    left: 50, 
+    width: 80, 
+    height: 80, 
+    zIndex: 5 
+  },
+  pipe: { position: "absolute", width: GAME_CONFIG.PIPE_WIDTH, zIndex: 2, borderRadius: 8, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)", backgroundColor: "#2ecc71" },
   layerContainer: { position: "absolute", flexDirection: "row", alignItems: "center", zIndex: 1 },
   cloud: { fontSize: 30, opacity: 0.8 },
   lyricText: { marginLeft: 10, fontSize: 16, fontWeight: "bold", color: "#fff", textShadowColor: "rgba(0, 0, 0, 0.4)", textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 4, maxWidth: width - 180 },

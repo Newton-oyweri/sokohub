@@ -284,7 +284,6 @@ export default function Review() {
             pointerEvents={comment.length > 0 || rating > 0 ? 'auto' : 'auto'}
           >
             <Animated.Image
-              source={require('../../assets/images/hill.png')}
               resizeMode="contain"
               style={[styles.cake, { opacity: cakeOpacity, transform: [{ scale: cakeScale }] }]}
             />

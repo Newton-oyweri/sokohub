@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { WalletData, STKPushPayload, STKPushResponse, Transaction } from '../types/wallet.types';
+import { STKPushPayload, STKPushResponse, Transaction, WalletData } from '../../../../../../components/wallet.types';
 
 export const walletService = {
   async getWalletData(userId: string): Promise<WalletData | null> {
@@ -147,3 +147,5 @@ export const walletService = {
     return cleaned;
   }
 };
+
+export default walletService;

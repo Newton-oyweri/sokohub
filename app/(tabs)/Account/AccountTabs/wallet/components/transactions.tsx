@@ -1,12 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-  View,
-  Text,
   StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Transaction } from '../types/wallet.types';
+import { Transaction } from '../../../../../../components/wallet.types';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -96,7 +96,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     </View>
   );
 };
-
+export default TransactionList;
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,

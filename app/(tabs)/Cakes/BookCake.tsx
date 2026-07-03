@@ -134,9 +134,10 @@ export default function WeddingCakesContent() {
       extrapolate: 'clamp',
     });
 
-    const imageSource = item.image_urls && item.image_urls.length > 0
-      ? { uri: item.image_urls[0] }
-      : require('../../../assets/images/wedding.png');
+    const imageSource =
+      item.image_urls?.length
+        ? { uri: item.image_urls[0] }
+        : undefined;
 
     const formattedPrice = `From KSh ${Number(item.price).toLocaleString()}`;
     const isLiked = likedProducts.has(item.id);

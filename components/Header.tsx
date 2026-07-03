@@ -20,6 +20,9 @@ const STATUS_BAR_HEIGHT =
 export const HEADER_HEIGHT =
   height * 0.35 + STATUS_BAR_HEIGHT;
 
+const CAKE_JSON_URL =
+  'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/cake.json';
+
 export default function Header() {
   return (
     <View
@@ -28,16 +31,16 @@ export default function Header() {
         { height: HEADER_HEIGHT },
       ]}
     >
-      {/* Animated Background */}
+      {/* Animated Background - Fetched from Supabase with safety transparency */}
       <LottieView
-        source={require('../assets/json/cake.json')}
+        source={{ uri: CAKE_JSON_URL }}
         autoPlay
         loop
         resizeMode="cover"
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'transparent' }]}
       />
 
-      {/* Cake Decoration */}
+      {/* Cake Decoration - Maintained Local */}
       <Image
         source={require('../assets/images/transparentcake.png')}
         resizeMode="contain"
@@ -84,9 +87,8 @@ const styles = StyleSheet.create({
   headerOverlay: {
     position: 'absolute',
     top: 0,
-    left: 0, // Allows text alignment formatting blocks to compute safely
+    left: 0,
 
-    // Align content explicitly to the top right side
     alignItems: 'flex-end', 
     justifyContent: 'flex-start',
 

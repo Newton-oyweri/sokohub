@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { sendNotification } from "@/lib/notifications";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -71,25 +72,23 @@ export default function AuthScreen() {
       // Production handling
     }
   };
-
-  const sendAuthSuccessNotification = async (isNewUser: boolean) => {
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: isNewUser ? 'Welcome to Wonderbakes!' : 'Welcome Back!',
-          body: isNewUser 
-            ? "Your account is ready. Let's find your perfect dessert!" 
-            : "You've successfully logged in. Enjoy browsing your favorites!",
-          data: { type: 'auth_success' },
-          sound: 'default',
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: null,
-      });
-    } catch {
-      // Production handling
-    }
-  };
+const sendAuthSuccessNotification = async (isNewUser: boolean) => {
+  try {
+    await sendNotification({
+      title: isNewUser
+        ? "Welcome to Wonderbakes!"
+        : "Welcome Back!",
+      body: isNewUser
+        ? "Your account is ready. Let's find your perfect dessert!"
+        : "You've successfully logged in. Enjoy browsing your favorites!",
+      data: {
+        type: "auth_success",
+      },
+    });
+  } catch {
+    // Production handling
+  }
+};
 
   const handleLogin = async () => {
     if (!email || !password) {

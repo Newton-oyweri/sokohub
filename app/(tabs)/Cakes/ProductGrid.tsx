@@ -27,8 +27,6 @@ export default function ProductGrid({ items }: ProductGridProps) {
     if (item.image) {
       return item.image;
     }
-    // Default placeholder
-    return require('../../../assets/images/town.png');
   };
 
   const itemRows = useMemo(() => {
@@ -57,7 +55,6 @@ export default function ProductGrid({ items }: ProductGridProps) {
           source={imageSource} 
           style={styles.itemImage} 
           resizeMode="cover"
-          defaultSource={require('../../../assets/images/town.png')}
         />
         
         <View style={styles.itemInfo}>

@@ -1,24 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../../lib/supabase';
 
 // Import components
-import { TransactionList } from './wallet/components/transactions';
 import { DepositModal } from './wallet/components/Deposit';
+import { TransactionList } from './wallet/components/transactions';
 
 // Import types
-import { Transaction, WalletScreenProps } from './wallet/types/wallet.types';
+import { Transaction, WalletScreenProps } from '../../../../components/wallet.types';
 
 // Import services
 import { walletService } from './wallet/services/walletService';

@@ -86,7 +86,6 @@ export default function CakesContent() {
     if (item.image_urls && item.image_urls.length > 0) {
       return { uri: item.image_urls[0] };
     }
-    return require('../../../assets/images/cake.png');
   };
 
   // 🔥 Skeleton Loader for Cards

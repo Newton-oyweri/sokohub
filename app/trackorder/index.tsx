@@ -137,9 +137,6 @@ export default function TrackOrder({ onBack }: { onBack: () => void }) {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={26} color="#1f2937" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Track Order</Text>
         </View>
         <View style={styles.loadingContainer}>

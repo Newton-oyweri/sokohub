@@ -117,10 +117,6 @@ export default function MyOrders({ onBack }: { onBack: () => void }) {
   // Restrict ONLY cancelled orders from tracking
   const isTrackable = (status: string) => status !== 'cancelled';
 
-  const getDefaultImage = () => {
-    return require('../../../../assets/images/town.png');
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -145,12 +141,12 @@ export default function MyOrders({ onBack }: { onBack: () => void }) {
 
         <View style={styles.cardContent}>
           {/* Product Image */}
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.productImage} />
-          ) : (
-            <Image source={getDefaultImage()} style={styles.productImage} />
-          )}
-
+        {imageUrl && (
+  <Image
+    source={{ uri: imageUrl }}
+    style={styles.productImage}
+  />
+)}
           {/* Details */}
           <View style={styles.detailsContainer}>
             <Text style={styles.productName} numberOfLines={1}>

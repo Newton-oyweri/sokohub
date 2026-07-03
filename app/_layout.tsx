@@ -18,6 +18,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '../lib/supabase';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NotificationSetup from '@/components/NotificationSetup';
+import { configureNotifications } from "@/lib/notifications";
+
 
 export default function RootLayout() {
   const router = useRouter();
@@ -25,6 +27,14 @@ export default function RootLayout() {
   const [modalVisible, setModalVisible] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [updating, setUpdating] = useState(false);
+  
+  useEffect(() => {
+    configureNotifications();
+    
+    // Added on top: Explicitly wakes up the Supabase auth client instance on cold boot 
+    // to guarantee it finishes extracting the persisted session from local storage.
+    supabase.auth.getSession();
+  }, []);
 
   useEffect(() => {
     const handleDeepLink = async () => {
@@ -188,7 +198,7 @@ export default function RootLayout() {
         </View>
       </Modal>
     </GestureHandlerRootView>
-     </SafeAreaProvider>
+       </SafeAreaProvider>
   );
 }
 
