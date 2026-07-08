@@ -11,16 +11,16 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import CakeCarousel from './Cakes/CakeCarousel';
-import Account from './Account/Account'; 
-import Header, { HEADER_HEIGHT } from '../../components/Header'; 
-import { supabase } from '../../lib/supabase';
+import CakeCarousel from '../Cakes/CakeCarousel';
+import Account from '../Account/Account'; 
+import Header, { HEADER_HEIGHT } from '../../../components/Header'; 
+import { supabase } from '../../../lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
 export default function App() {
-  // Default is active tab set to 'cakes' (Shop)
-  const [activeTab, setActiveTab] = useState<'cakes' | 'account'>('cakes');
+  // Set default active tab to 'account'
+  const [activeTab, setActiveTab] = useState<'cakes' | 'account'>('account');
 
   // Auth & Profile states
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -224,7 +224,7 @@ export default function App() {
             {/* Shop Tab */}
             <TouchableOpacity 
               style={[styles.tabButton, activeTab === 'cakes' && styles.activeTabButton]}
-              onPress={() => setActiveTab('cakes')}
+              onPress={() => router.push("/(tabs)")} // Maps to app/(tabs)/index
               activeOpacity={0.8}
             >
               <Ionicons
@@ -240,7 +240,7 @@ export default function App() {
             {/* Account Tab */}
             <TouchableOpacity 
               style={[styles.tabButton, activeTab === 'account' && styles.activeTabButton]}
-              onPress={() => router.push("./Account")} // Route to target directory
+              onPress={() => setActiveTab('account')}
               activeOpacity={0.8}
             >
               {isLoggedIn && avatarUrl ? (

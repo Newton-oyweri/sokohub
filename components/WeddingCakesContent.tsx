@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { File, Paths } from 'expo-file-system'; // ADDED
 
 const { width } = Dimensions.get('window');
 
@@ -19,18 +18,15 @@ const CARD_WIDTH = width * 0.78;
 const SPACING = 20;
 const ITEM_WIDTH = CARD_WIDTH + SPACING * 2;
 
-// ADDED - Cache file
-const cacheFile = new File(Paths.cache, 'wedding_cakes_cache.json');
-
 interface Product {
   id: string;
   name: string;
   description: string | null;
   price: number;
   image_urls: string[] | null;
-  seller_id: string;
   post_type: 'sale' | 'booking' | 'pinned';
-  rating?: number; 
+  rating?: number;
+  seller_id: string;
 }
 
 export default function WeddingCakesContent() {
@@ -42,25 +38,8 @@ export default function WeddingCakesContent() {
   const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    loadCachedData(); // ADDED
     fetchWeddingCakes();
   }, []);
-
-  // ADDED - Load cache
-  const loadCachedData = async () => {
-    try {
-      if (cacheFile.exists) {
-        const cachedContent = await cacheFile.text();
-        const parsedData = JSON.parse(cachedContent);
-        if (parsedData && parsedData.length > 0) {
-          setCakes(parsedData);
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-      console.log('Error reading cache:', err);
-    }
-  };
 
   const fetchWeddingCakes = async () => {
     try {
@@ -68,7 +47,7 @@ export default function WeddingCakesContent() {
       
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description,seller_id, price, image_urls, post_type, rating')
+        .select('id, name, description, price, image_urls, post_type, rating, user_id as seller_id')
         .eq('category', 'cake')
         .eq('is_available', true)
         .eq('post_type', 'booking')
@@ -80,16 +59,19 @@ export default function WeddingCakesContent() {
       }
 
       if (data && data.length > 0) {
-        const formattedData = data.map((item) => ({
-          ...item,
-          rating: item.rating || 0,
+        const formattedData: Product[] = data.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          image_urls: item.image_urls,
+          post_type: item.post_type,
+          seller_id: item.seller_id,
+          rating: item.rating ?? 0,
         }));
         setCakes(formattedData);
-        // ADDED - Save to cache
-        await cacheFile.write(JSON.stringify(formattedData));
       } else {
         console.warn("No booking cakes found.");
-        await cacheFile.write(JSON.stringify([])); // ADDED
       }
     } catch (error) {
       console.error('Network or Initialization error fetching wedding cakes:', error);
@@ -98,16 +80,13 @@ export default function WeddingCakesContent() {
     }
   };
 
-  // 🔥 Handle heart tap - increment rating by 0.1
   const handleHeartPress = async (productId: string, currentRating: number) => {
-    // Prevent multiple taps
     if (likedProducts.has(productId)) {
       return;
     }
 
     const newRating = Math.min(currentRating + 0.1, 10);
 
-    // Update UI immediately (optimistic update)
     setCakes(prevProducts =>
       prevProducts.map(product =>
         product.id === productId
@@ -116,10 +95,8 @@ export default function WeddingCakesContent() {
       )
     );
 
-    // Mark as liked
     setLikedProducts(prev => new Set(prev).add(productId));
 
-    // Update in Supabase
     try {
       const { error } = await supabase
         .from('products')
@@ -127,18 +104,8 @@ export default function WeddingCakesContent() {
         .eq('id', productId);
 
       if (error) throw error;
-      
-      // ADDED - Update cache with new rating
-      const updatedCakes = cakes.map(product =>
-        product.id === productId
-          ? { ...product, rating: newRating }
-          : product
-      );
-      await cacheFile.write(JSON.stringify(updatedCakes));
-      
     } catch (error) {
       console.error('Error updating rating:', error);
-      // Revert if error
       setCakes(prevProducts =>
         prevProducts.map(product =>
           product.id === productId
@@ -231,24 +198,23 @@ export default function WeddingCakesContent() {
             <View style={styles.priceRow}>
               <Text style={styles.price}>{formattedPrice}</Text>
 
-                <TouchableOpacity
-                  style={styles.bookButton}
-                  onPress={() => router.push({
-                    pathname: '../book',
-                    params: { 
-                      id: item.id,
-                      name: item.name,
-                      price: item.price.toString(),
-                      image_urls: JSON.stringify(item.image_urls || []),
-                      seller_id: item.seller_id,
-                    }
-                  })}
-                >
-                  <Text style={styles.bookButtonText}>
-                    Book Now
-                  </Text>
-                </TouchableOpacity>
-
+              <TouchableOpacity
+                style={styles.bookButton}
+                onPress={() => router.push({
+                  pathname: '../book',
+                  params: { 
+                    id: item.id,
+                    name: item.name,
+                    price: item.price.toString(),
+                    image_urls: JSON.stringify(item.image_urls || []),
+                    seller_id: item.seller_id,
+                  }
+                })}
+              >
+                <Text style={styles.bookButtonText}>
+                  Book Now
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
@@ -260,10 +226,10 @@ export default function WeddingCakesContent() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
         <Text style={{ color: '#64748b', fontSize: 16, textAlign: 'center' }}>
-          No bookings available at the moment.
+          No booking cakes available at the moment.
         </Text>
         <Text style={{ color: '#94a3b8', fontSize: 14, marginTop: 8 }}>
-          Check back later! 
+          Check back later for bookings!
         </Text>
       </View>
     );
@@ -271,12 +237,12 @@ export default function WeddingCakesContent() {
 
   return (
     <View style={styles.container}>
-  <View style={styles.header}>
-  <Text style={styles.title}>Occasion Designs</Text>
-  <Text style={styles.subtitle}>
-    We've got you covered for birthdays, weddings, graduations & every celebration.
-  </Text>
-</View>
+      <View style={styles.header}>
+        <Text style={styles.title}>Occasion Designs</Text>
+        <Text style={styles.subtitle}>
+          We've got you covered for birthdays, weddings, graduations & every celebration.
+        </Text>
+      </View>
 
       <Animated.FlatList
         data={cakes}
@@ -346,23 +312,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(107,70,193,0.12)',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(107, 70, 193, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   details: {
     padding: 18,

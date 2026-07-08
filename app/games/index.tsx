@@ -6,9 +6,20 @@ import {
   ScrollView,
   SafeAreaView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Href } from 'expo-router';
 import * as NavigationBar from 'expo-navigation-bar';
-import SkyBeatsGameCard from './memory/Gamecard';
+import SkyBeatsGameCard from './gamecards/fly';
+import Allgames from './gamecards/Gamecard';
+import { GAME_IMAGES } from './gameImages';
+
+// Define the Game interface to match what Allgames expects
+interface Game {
+  id: string;
+  title: string;
+  image: any;
+  route: Href;
+
+}
 
 export default function GamesHub() {
   const router = useRouter();
@@ -27,6 +38,19 @@ export default function GamesHub() {
     setupNavigationBar();
   }, []);
 
+  const games: Game[] = [
+    {
+      id: '2048',
+      title: '2048',
+      image: GAME_IMAGES.puzzle2,
+      route: '/games/html5games/2048Game' as Href,
+    }
+  ];
+
+  const handleGamePress = (route: Href) => {
+    router.push(route);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Centered WB Games Header */}
@@ -44,11 +68,33 @@ export default function GamesHub() {
         </Text>
 
         <View style={styles.centeredContainer}>
+          {/* Main Sky Beats Game */}
           <SkyBeatsGameCard 
             onPress={() => router.push('/games/memory')}
             imageError={imageError}
             setImageError={setImageError}
           />
+        </View>
+        {/* route to game two in gamecards folder
+        <View style={styles.centeredContainer}>
+          <SkyBeatsGameCard 
+            onPress={() => router.push('/games/test') }
+            imageError={imageError}
+            setImageError={setImageError}
+          />
+          
+        </View> */}
+
+
+        {/* Other 7 Games - Unified styling */}
+        <View style={styles.otherGamesContainer}>
+          <Text style={styles.otherGamesTitle}>More Games</Text>
+          <Allgames 
+            games={games}
+            onGamePress={handleGamePress}
+          />
+
+
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -68,7 +114,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF9E6',
     borderBottomWidth: 2,
     borderBottomColor: '#F3EAD3',
-    paddingBottom: 12, // Keeps text looking nicely balanced above the border line
+    paddingBottom: 12,
   },
   headerTitle: {
     fontSize: 22,
@@ -93,5 +139,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 10,
+  },
+  otherGamesContainer: {
+    marginTop: 30,
+  },
+  otherGamesTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#5C3E35',
+    marginBottom: 16,
+    textAlign: 'center',
   },
 });

@@ -67,16 +67,6 @@ export default function MarketSection() {
     setFilteredItems(filtered);
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <View style={[styles.centerContainer, { paddingBottom: insets.bottom + 20 }]}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-      </View>
-    );
-  }
-
-
   return (
     <View style={[styles.marketContainer, { paddingBottom: insets.bottom + 20 }]}>
       <CategoryTabs 

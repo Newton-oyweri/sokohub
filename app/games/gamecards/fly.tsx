@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ const SkyBeatsGameCard = ({ onPress, imageError, setImageError }: SkyBeatsGameCa
     image: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/skybeat%20logo.png',
   };
 
+  // Track if the network stream has fully loaded the asset file yet
+  const [imageLoaded, setImageLoaded] = useState(false);
+
   return (
     <TouchableOpacity
       style={styles.horizontalBar}
@@ -30,15 +33,23 @@ const SkyBeatsGameCard = ({ onPress, imageError, setImageError }: SkyBeatsGameCa
       onPress={onPress}
     >
       <View style={styles.leftContent}>
-        {!imageError ? (
+        {/* 1. Show text IMMEDIATELY by default if image hasn't loaded yet, or if it failed */}
+        {(!imageLoaded || imageError) && (
+          <Text style={styles.gameTitle}>{ACTIVE_GAME.title}</Text>
+        )}
+
+        {/* 2. Load image in background, swap it into view with absolute styling only when ready */}
+        {!imageError && (
           <Image
             source={{ uri: ACTIVE_GAME.image }}
-            style={styles.gameLogo}
-            resizeMode="cover" // Changed to 'cover' so the image fills the rounded boundaries beautifully
+            style={[
+              styles.gameLogo, 
+              imageLoaded ? styles.imageLoadedPosition : styles.imageHiddenHidden
+            ]}
+            resizeMode="cover"
+            onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
           />
-        ) : (
-          <Text style={styles.gameTitle}>{ACTIVE_GAME.title}</Text>
         )}
       </View>
 
@@ -72,13 +83,26 @@ const styles = StyleSheet.create({
   leftContent: {
     flex: 1,
     justifyContent: 'center',
+    height: '100%', // Enforce boundary container context
   },
   gameLogo: {
-    width: 44,             // Made it a uniform square so a large radius makes it perfectly round
+    width: 44,
     height: 44,
-    borderRadius: 12,      // Applied here! (Or change to 22 for a perfect circle, 48 works great if the square is 96x96)
-    overflow: 'hidden',    // Essential for clipping image edges on iOS & Android
-    backgroundColor: '#FFFDF9', // Clean background frame under the logo
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#FFFDF9',
+  },
+  // Keeps image from throwing off text layout flows while it loads in the background
+  imageHiddenHidden: {
+    position: 'absolute',
+    opacity: 0,
+    width: 0,
+    height: 0,
+  },
+  // Places image nicely aligned left inside container once loaded
+  imageLoadedPosition: {
+    position: 'relative',
+    opacity: 1,
   },
   gameTitle: {
     color: '#5C3E35',

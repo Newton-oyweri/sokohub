@@ -3,17 +3,16 @@
     "name": "Wonderbakes",
     "slug": "sokohub",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/41c96e3f-d6b2-49fd-bccc-323ce431dcfb"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sokohub",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.isackskyla.sokohub",
-      "associatedDomains": [
-        "applinks:sokohub.com"
-      ]
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
@@ -61,13 +60,10 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#6b46c1",
           "sounds": [
-            "./assets/audio/notification_sound.wav"
+            "./assets/sounds/notification_sound.wav"
           ]
         }
-      ],
-      "expo-dev-client",
-      "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      ]
     ],
     "experiments": {
       "typedRoutes": true

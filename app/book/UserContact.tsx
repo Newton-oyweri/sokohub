@@ -1,3 +1,4 @@
+// usecontact
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -67,12 +68,6 @@ export default function UserContact() {
         <View style={styles.notLoggedIn}>
           <Ionicons name="person-outline" size={32} color="#94a3b8" />
           <Text style={styles.notLoggedInText}>You are not logged in</Text>
-          <TouchableOpacity 
-            style={styles.loginButton}
-            onPress={() => router.push('/auth')}
-          >
-            <Text style={styles.loginButtonText}>Log In</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );

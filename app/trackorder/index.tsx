@@ -151,9 +151,6 @@ export default function TrackOrder({ onBack }: { onBack: () => void }) {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={26} color="#1f2937" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Track Order</Text>
         </View>
         <View style={styles.emptyContainer}>
@@ -168,9 +165,7 @@ export default function TrackOrder({ onBack }: { onBack: () => void }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={26} color="#1f2937" />
-        </TouchableOpacity>
+     
         <View>
           <Text style={styles.headerTitle}>Track Order</Text>
           <Text style={styles.headerSubtitle}>{order.order_number}</Text>
@@ -307,11 +302,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-    marginRight: 8,
   },
   headerTitle: {
     fontSize: 20,

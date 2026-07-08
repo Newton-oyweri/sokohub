@@ -1,3 +1,4 @@
+// /lib/notifications
 import * as Notifications from "expo-notifications";
 
 export const DEFAULT_SOUND = "notification_sound.wav";

@@ -11,14 +11,25 @@ import {
   Alert,
   Platform,
   Modal,
+  Image,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import WeddingCakesContent from '../../components/WeddingCakesContent'; // Import the product list
 
 export default function BookWeddingCake() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  
+  // Get product data from navigation params
+  const productId = params.id as string;
+  const productName = params.name as string || 'Wedding Cake';
+  const productPrice = parseFloat(params.price as string) || 0;
+  const sellerId = params.seller_id as string;
+  const imageUrls = params.image_urls ? JSON.parse(params.image_urls as string) : [];
 
   const [guests, setGuests] = useState('');
   const [duration, setDuration] = useState('This Month');
@@ -26,6 +37,8 @@ export default function BookWeddingCake() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   
   // Date picker states
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -112,6 +125,78 @@ export default function BookWeddingCake() {
     }
   };
 
+const handleBooking = async () => {
+  // If not logged in, redirect to auth
+  if (!user) {
+    router.push('/auth');
+    return;
+  }
+
+  try {
+    // Validate guests
+    const guestCount = parseInt(guests);
+    if (!guests || isNaN(guestCount) || guestCount < 1) {
+      Alert.alert('Invalid Input', 'Please enter a valid number of guests');
+      return;
+    }
+
+    setSubmitting(true);
+
+    // Combine all booking details including contact info into notes
+    const bookingNotes = `
+      Customer Email: ${user.email}
+      Customer Phone: ${profile?.phone || 'Not provided'}
+      Customer Name: ${profile?.full_name || 'Not provided'}
+      ---
+      Booking Details:
+      Guests: ${guests}
+      Needed by: ${duration}
+      Special Requests: ${notes || 'None'}
+    `.trim();
+
+    // Create order in database
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        customer_id: user.id,
+        product_id: productId,
+        seller_id: sellerId,
+        status: 'pending',
+        notes: bookingNotes,
+        order_type: 'booking',
+      });
+
+    if (orderError) throw orderError;
+
+    Alert.alert(
+      'Booking Submitted!',
+      'Your booking has been submitted successfully. We will contact you shortly.',
+      [{ text: 'OK', onPress: () => router.back() }]
+    );
+
+  } catch (error: any) {
+    Alert.alert('Booking Failed', error.message || 'Please try again');
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+  const renderImageItem = ({ item, index }: { item: string; index: number }) => (
+    <TouchableOpacity
+      style={[
+        styles.imageDot,
+        activeImageIndex === index && styles.imageDotActive,
+      ]}
+      onPress={() => setActiveImageIndex(index)}
+    >
+      <Image
+        source={{ uri: item }}
+        style={styles.thumbnailImage}
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, styles.center]}>
@@ -120,6 +205,16 @@ export default function BookWeddingCake() {
     );
   }
 
+  // If no product selected (coming from main page), show the product list
+  if (!productId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <WeddingCakesContent />
+      </SafeAreaView>
+    );
+  }
+
+  // Booking form with product details
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -132,29 +227,49 @@ export default function BookWeddingCake() {
           quotation.
         </Text>
 
-        {/* Cake */}
+        {/* Cake with Images */}
         <View style={styles.card}>
-          <View style={styles.row}>
-            <Ionicons
-              name="sparkles"
-              size={22}
-              color="#6b46c1"
-            />
-
-            <View style={{ marginLeft: 12, flex: 1 }}>
-              <Text style={styles.label}>Selected Cake</Text>
-              <Text style={styles.value}>
-                Royal Wedding Cake
-              </Text>
-              <Text style={styles.price}>
-                KSh 45,000
-              </Text>
+          {/* Main Image */}
+          {imageUrls.length > 0 && (
+            <View style={styles.mainImageContainer}>
+              <Image
+                source={{ uri: imageUrls[activeImageIndex] }}
+                style={styles.mainImage}
+                resizeMode="cover"
+              />
+              {imageUrls.length > 1 && (
+                <View style={styles.imageCounter}>
+                  <Text style={styles.imageCounterText}>
+                    {activeImageIndex + 1} / {imageUrls.length}
+                  </Text>
+                </View>
+              )}
             </View>
+          )}
+
+          {/* Thumbnail Images */}
+          {imageUrls.length > 1 && (
+            <View style={styles.thumbnailContainer}>
+              <FlatList
+                data={imageUrls}
+                renderItem={renderImageItem}
+                keyExtractor={(item, index) => `${item}-${index}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.thumbnailList}
+              />
+            </View>
+          )}
+
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{productName}</Text>
+            <Text style={styles.productPrice}>
+              KSh {productPrice.toLocaleString()}
+            </Text>
           </View>
         </View>
 
         {/* Guests */}
-
         <Text style={styles.sectionTitle}>
           Number of Guests
         </Text>
@@ -168,7 +283,6 @@ export default function BookWeddingCake() {
         />
 
         {/* Duration */}
-
         <Text style={styles.sectionTitle}>
           When do you need it?
         </Text>
@@ -197,7 +311,6 @@ export default function BookWeddingCake() {
         </View>
 
         {/* Notes */}
-
         <Text style={styles.sectionTitle}>
           Questions or Special Requests
         </Text>
@@ -256,7 +369,6 @@ export default function BookWeddingCake() {
         )}
 
         {/* Summary */}
-
         <View style={styles.summary}>
           <Text style={styles.summaryTitle}>
             Booking Summary
@@ -268,7 +380,7 @@ export default function BookWeddingCake() {
             </Text>
 
             <Text style={styles.summaryValue}>
-              Royal Wedding Cake
+              {productName}
             </Text>
           </View>
 
@@ -299,17 +411,22 @@ export default function BookWeddingCake() {
           </Text>
 
           <Text style={styles.bigPrice}>
-            KSh 45,000+
+            KSh {productPrice.toLocaleString()}+
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.back()}
+          style={[styles.button, submitting && styles.buttonDisabled]}
+          onPress={handleBooking}
+          disabled={submitting}
         >
-          <Text style={styles.buttonText}>
-            Book Now
-          </Text>
+          {submitting ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {!user ? 'Login to Book' : 'Book Now'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <Text style={styles.footer}>
@@ -415,28 +532,80 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
 
-  row: {
+  mainImageContainer: {
+    width: '100%',
+    height: 250,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    position: 'relative',
+  },
+
+  mainImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  imageCounter: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+
+  imageCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  thumbnailContainer: {
+    marginBottom: 12,
+  },
+
+  thumbnailList: {
+    gap: 8,
+  },
+
+  imageDot: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+
+  imageDotActive: {
+    borderColor: PRIMARY,
+  },
+
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  productInfo: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
 
-  label: {
-    color: '#64748b',
-    fontSize: 13,
-  },
-
-  value: {
+  productName: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    marginTop: 2,
+    flex: 1,
   },
 
-  price: {
-    marginTop: 4,
-    color: PRIMARY,
+  productPrice: {
+    fontSize: 18,
     fontWeight: '800',
-    fontSize: 17,
+    color: PRIMARY,
   },
 
   input: {
@@ -486,12 +655,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-  },
-
-  small: {
-    marginTop: 4,
-    color: '#64748b',
-    lineHeight: 20,
   },
 
   summary: {
@@ -550,6 +713,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+
   buttonText: {
     color: '#fff',
     fontSize: 18,
@@ -564,7 +731,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // User Details Styles
   userDetails: {
     width: '100%',
   },
@@ -617,7 +783,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Date Picker Modal Styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

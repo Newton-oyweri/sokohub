@@ -63,42 +63,43 @@ export default function MyOrders({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const fetchOrders = async (uid: string) => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          products (
-            id,
-            name,
-            price,
-            image_urls,
-            seller_id
-          )
-        `)
-        .eq('customer_id', uid)
-        .order('created_at', { ascending: false });
+const fetchOrders = async (uid: string) => {
+  try {
+    setLoading(true);
+    
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        products (
+          id,
+          name,
+          price,
+          image_urls,
+          seller_id
+        )
+      `)
+      .eq('customer_id', uid)
+      .eq('order_type', 'normalorder') // Add this line to filter only normal orders
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOrders(data || []);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      Alert.alert('Error', 'Failed to load orders');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    if (error) throw error;
+    setOrders(data || []);
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    Alert.alert('Error', 'Failed to load orders');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
-  const onRefresh = () => {
-    if (userId) {
-      setRefreshing(true);
-      fetchOrders(userId);
-    }
-  };
+const onRefresh = () => {
+  if (userId) {
+    setRefreshing(true);
+    fetchOrders(userId);
+  }
+};
 
   // Updated Status Config
   const getStatusConfig = (status: string) => {

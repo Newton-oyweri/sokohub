@@ -1,3 +1,4 @@
+import { sendNotification } from "@/lib/notifications";
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
@@ -15,12 +16,11 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { sendNotification } from "@/lib/notifications";
 
+// Configure notification handler once
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
-    shouldShowSound: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
@@ -36,7 +36,6 @@ export default function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [expoPushToken, setExpoPushToken] = useState('');
 
   useEffect(() => {
     registerForPushNotifications();
@@ -45,20 +44,15 @@ export default function AuthScreen() {
   const registerForPushNotifications = async () => {
     try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
       
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
+        if (status !== 'granted') return;
       }
       
-      if (finalStatus !== 'granted') return;
-      
-      const token = await Notifications.getExpoPushTokenAsync({
+      await Notifications.getExpoPushTokenAsync({
         projectId: '41c96e3f-d6b2-49fd-bccc-323ce431dcfb',
       });
-      
-      setExpoPushToken(token.data);
 
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
@@ -69,85 +63,64 @@ export default function AuthScreen() {
         });
       }
     } catch {
-      // Production handling
+      // Silent fail for push notifications
     }
   };
-const sendAuthSuccessNotification = async (isNewUser: boolean) => {
-  try {
-    await sendNotification({
-      title: isNewUser
-        ? "Welcome to Wonderbakes!"
-        : "Welcome Back!",
-      body: isNewUser
-        ? "Your account is ready. Let's find your perfect dessert!"
-        : "You've successfully logged in. Enjoy browsing your favorites!",
-      data: {
-        type: "auth_success",
-      },
-    });
-  } catch {
-    // Production handling
-  }
-};
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const sendAuthSuccessNotification = async (isNewUser: boolean) => {
+    try {
+      await sendNotification({
+        title: isNewUser ? "Welcome to Wonderbakes!" : "Welcome Back!",
+        body: isNewUser
+          ? "Your account is ready. Let's find your perfect dessert!"
+          : "You've successfully logged in. Enjoy browsing your favorites!",
+        data: { type: "auth_success" },
+      });
+    } catch {
+      // Silent fail for notifications
+    }
+  };
+
+  const validateFields = (): string | null => {
+    if (!email || !password) return 'Please fill in all fields';
+    if (!isLogin) {
+      if (!confirmPassword) return 'Please fill in all fields';
+      if (password.length < 6) return 'Password must be at least 6 characters';
+      if (password !== confirmPassword) return 'Passwords do not match';
+    }
+    return null;
+  };
+
+  const handleAuth = async () => {
+    const error = validateFields();
+    if (error) {
+      Alert.alert('Error', error);
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
-      });
+      let result;
+      if (isLogin) {
+        result = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+      } else {
+        result = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+      }
 
-      if (error) throw error;
+      if (result.error) throw result.error;
       
-      await sendAuthSuccessNotification(false);
-      
-      // Navigate back to previous screen or tabs
-      router.back();
-      
-    } catch (error: any) {
-      Alert.alert('Login Failed', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async () => {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        await sendAuthSuccessNotification(true);
+      if (result.data.user) {
+        await sendAuthSuccessNotification(!isLogin);
         router.back();
       }
     } catch (error: any) {
-      Alert.alert('Sign Up Failed', error.message);
+      Alert.alert(isLogin ? 'Login Failed' : 'Sign Up Failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -162,7 +135,7 @@ const sendAuthSuccessNotification = async (isNewUser: boolean) => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'sokohub://',  
+        redirectTo: 'sokohub://',
       });
 
       if (error) throw error;
@@ -271,7 +244,7 @@ const sendAuthSuccessNotification = async (isNewUser: boolean) => {
 
             <TouchableOpacity
               style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-              onPress={isLogin ? handleLogin : handleSignUp}
+              onPress={handleAuth}
               disabled={loading}
             >
               {loading ? (

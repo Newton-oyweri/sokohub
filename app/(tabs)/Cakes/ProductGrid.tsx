@@ -1,5 +1,5 @@
 // ProductGrid.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { File, Paths } from 'expo-file-system'; // ADDED
+
+// ADDED - Cache file
+const cacheFile = new File(Paths.cache, 'product_grid_cache.json');
 
 type ProductGridProps = {
   items: any[];
@@ -17,25 +21,69 @@ type ProductGridProps = {
 export default function ProductGrid({ items }: ProductGridProps) {
   const router = useRouter();
 
+  // ADDED - State for cached items
+  const [cachedItems, setCachedItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ADDED - Load cache on mount
+  useEffect(() => {
+    loadCache();
+  }, []);
+
+  // ADDED - Update cache when items change
+  useEffect(() => {
+    if (items && items.length > 0) {
+      saveCache(items);
+      setCachedItems(items);
+      setLoading(false);
+    }
+  }, [items]);
+
+  // ADDED - Cache functions
+  const loadCache = async () => {
+    try {
+      if (cacheFile.exists) {
+        const cachedContent = await cacheFile.text();
+        const parsedData = JSON.parse(cachedContent);
+        if (parsedData && parsedData.length > 0) {
+          setCachedItems(parsedData);
+        }
+      }
+    } catch (err) {
+      console.log('Error reading cache:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveCache = async (data: any[]) => {
+    try {
+      await cacheFile.write(JSON.stringify(data));
+    } catch (err) {
+      console.log('Error saving cache:', err);
+    }
+  };
+
   // Helper to get first image from array or fallback
   const getProductImage = (item: any) => {
-    // Check if image_urls exists and is an array with items
     if (item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) {
       return { uri: item.image_urls[0] };
     }
-    // Fallback to static image if item.image exists (for backwards compatibility)
     if (item.image) {
       return item.image;
     }
   };
 
+  // Use cached items if available and no items prop provided
+  const displayItems = items?.length > 0 ? items : cachedItems;
+
   const itemRows = useMemo(() => {
     const rows = [];
-    for (let i = 0; i < items.length; i += 2) {
-      rows.push(items.slice(i, i + 2));
+    for (let i = 0; i < displayItems.length; i += 2) {
+      rows.push(displayItems.slice(i, i + 2));
     }
     return rows;
-  }, [items]);
+  }, [displayItems]);
 
   const renderMarketItem = (item: any) => {
     const imageSource = getProductImage(item);
@@ -84,7 +132,7 @@ export default function ProductGrid({ items }: ProductGridProps) {
 
   return (
     <View style={styles.gridContainer}>
-      {items.length === 0 ? (
+      {displayItems.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="search-outline" size={64} color="#cbd5e1" />
           <Text style={styles.emptyTitle}>No items found</Text>

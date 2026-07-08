@@ -11,40 +11,68 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { File, Paths } from 'expo-file-system';
 import BookCake from './BookCake';
 import Market from './MarketSection';
-import SkeletonLoader from './SkeletonLoader'; // Import your skeleton loader
+import SkeletonLoader from './SkeletonLoader';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.78;
 const SPACING = 20;
 const ITEM_WIDTH = CARD_WIDTH + SPACING * 2;
 
+// Modern SDK 54+ Object-oriented cache declaration
+const cacheFile = new File(Paths.cache, 'pinned_products_cache.json');
+
 interface Product {
   id: string;
-  seller_id:string;
+  seller_id: string;
   name: string;
   description: string | null;
   price: number;
   image_urls: string[] | null;
   post_type: 'sale' | 'booking' | 'pinned';
-  sold?: string;
 }
 
 export default function CakesContent() {
   const scrollX = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const router = useRouter();
   
   const [pinnedProducts, setPinnedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    loadCachedData();
     fetchPinnedProducts();
+
+    // Loop a playful breathing pulse animation for the Quick Order buttons
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.06, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
+
+  const loadCachedData = async () => {
+    try {
+      if (cacheFile.exists) {
+        const cachedContent = await cacheFile.text();
+        const parsedData = JSON.parse(cachedContent);
+        if (parsedData && parsedData.length > 0) {
+          setPinnedProducts(parsedData);
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      console.log('Error reading filesystem cache:', err);
+    }
+  };
 
   const fetchPinnedProducts = async () => {
     try {
-      setLoading(true);
+      if (pinnedProducts.length === 0) setLoading(true);
       
       const { data, error } = await supabase
         .from('products')
@@ -53,14 +81,10 @@ export default function CakesContent() {
         .eq('post_type', 'pinned')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Supabase Database Error: ", error.message);
-        throw error;
-      }
+      if (error) throw error;
 
       if (data && data.length > 0) {
-        const formattedData = data.map((item) => ({
-          // ensure required Product fields exist; provide sensible defaults
+        const formattedData: Product[] = data.map((item) => ({
           id: item.id,
           seller_id: item.seller_id ?? '',
           name: item.name,
@@ -68,11 +92,13 @@ export default function CakesContent() {
           price: item.price ?? 0,
           image_urls: item.image_urls ?? null,
           post_type: item.post_type ?? 'pinned',
-          sold: `${Math.floor(Math.random() * 5) + 1}k`,
-        } as Product));
+        }));
+        
         setPinnedProducts(formattedData);
+        
+        // Modern SDK 54 single line writing
+        await cacheFile.write(JSON.stringify(formattedData));
       } else {
-        console.warn("No pinned products found.");
         setPinnedProducts([]);
       }
     } catch (error) {
@@ -86,9 +112,9 @@ export default function CakesContent() {
     if (item.image_urls && item.image_urls.length > 0) {
       return { uri: item.image_urls[0] };
     }
+    return undefined;
   };
 
-  // 🔥 Skeleton Loader for Cards
   const renderSkeleton = () => {
     return (
       <View style={styles.skeletonContainer}>
@@ -161,6 +187,9 @@ export default function CakesContent() {
 
             <View style={styles.priceRow}>
               <Text style={styles.price}>{formattedPrice}</Text>
+              
+              {/* Animated Wrapper focusing scale exclusively around the button view */}
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                 <TouchableOpacity
                   style={styles.orderButton}
                   onPress={() => router.push({
@@ -178,6 +207,7 @@ export default function CakesContent() {
                 >
                   <Text style={styles.orderButtonText}>Quick Order</Text>
                 </TouchableOpacity>
+              </Animated.View>
             </View>
           </View>
         </TouchableOpacity>
@@ -187,15 +217,14 @@ export default function CakesContent() {
 
   return (
     <View style={styles.container}>
-    <View style={styles.header}>
-  <Text style={styles.title}>Weekly Specials</Text>
-  <Text style={styles.subtitle}>
-    Fresh picks, exclusive deals, and customer favorites this week.
-  </Text>
-</View>
+      <View style={styles.header}>
+        <Text style={styles.title}>Weekly Specials</Text>
+        <Text style={styles.subtitle}>
+          Fresh picks, exclusive deals, and customer favorites this week.
+        </Text>
+      </View>
 
       {loading ? (
-        // 🔥 Skeleton Loader
         renderSkeleton()
       ) : pinnedProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -229,7 +258,7 @@ export default function CakesContent() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#ffffff00' 
+    backgroundColor: 'transparent' 
   },
   header: {
     paddingHorizontal: 20,
@@ -300,12 +329,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   priceRow: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 8,
-},
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
   price: {
     fontSize: 26,
     fontWeight: '800',
@@ -340,7 +369,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  // 🔥 Skeleton Styles
   skeletonContainer: {
     flexDirection: 'row',
     paddingHorizontal: (width - CARD_WIDTH) / 2,
@@ -359,11 +387,6 @@ const styles = StyleSheet.create({
     width: 120,
     height: 20,
     borderRadius: 4,
-  },
-  skeletonHeart: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
   },
   skeletonDescription: {
     width: '100%',

@@ -8,7 +8,8 @@ import {
 } from "react-native";
 import * as NavigationBar from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
-import { Audio } from "expo-av";
+
+import { Audio} from "expo-av";
 import LottieView from 'lottie-react-native';
 
 // Import your Aeroplane.json
@@ -382,9 +383,8 @@ export default function GameScreen() {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
   return (
-    <>
+    <>  
       <StatusBar hidden />
       <Pressable style={styles.container} onPress={fly}>
         
