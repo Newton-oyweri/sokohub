@@ -1,14 +1,14 @@
+import LottieView from 'lottie-react-native';
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   Dimensions,
+  Image,
   Platform,
   StatusBar,
-  Image,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import LottieView from 'lottie-react-native';
 
 const { height } = Dimensions.get('window');
 
@@ -20,8 +20,20 @@ const STATUS_BAR_HEIGHT =
 export const HEADER_HEIGHT =
   height * 0.35 + STATUS_BAR_HEIGHT;
 
-const CAKE_JSON_URL =
-  'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/cake.json';
+// Map of 7 days of the week to their respective JSON animations
+const ANIMATION_URLS: Record<number, string> = {
+  0: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/cake.json',      // Sunday
+  1: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/pizza.json',     // Monday
+  2: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/birthday.json',  // Tuesday
+  3: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/bunnie.json',    // Wednesday
+  4: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/Buynow.json',    // Thursday
+  5: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/Fireworks.json', // Friday
+  6: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/app_general_images/couple.json',    // Saturday
+};
+
+// Get the current day index (0 = Sunday, 1 = Monday, etc.)
+const currentDay = new Date().getDay();
+const DYNAMIC_JSON_URL = ANIMATION_URLS[currentDay];
 
 export default function Header() {
   return (
@@ -31,9 +43,9 @@ export default function Header() {
         { height: HEADER_HEIGHT },
       ]}
     >
-      {/* Animated Background - Fetched from Supabase with safety transparency */}
+      {/* Animated Background - Dynamically matches the day of the week */}
       <LottieView
-        source={{ uri: CAKE_JSON_URL }}
+        source={{ uri: DYNAMIC_JSON_URL }}
         autoPlay
         loop
         resizeMode="cover"

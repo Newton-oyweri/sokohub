@@ -13,12 +13,12 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width } = Dimensions.get('window');
+const { width, height: screenHeight } = Dimensions.get('window');
 
-const CARD_WIDTH = width * 0.78;
-const SPACING = 20;
-const ITEM_WIDTH = CARD_WIDTH + SPACING * 2;
-const PAGE_SIZE = 6;
+// Updated for full width with minimal padding
+const CARD_WIDTH = width * 0.92; // Almost full width
+const SPACING = 8; // Reduced spacing
+const ITEM_WIDTH = CARD_WIDTH + SPACING;
 
 interface Product {
   id: string;
@@ -56,8 +56,8 @@ export default function WeddingCakesContent() {
         setLoading(true);
       }
 
-      const from = pageToFetch * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+      const from = pageToFetch * 6;
+      const to = from + 6 - 1;
 
       const { data, error } = await supabase
         .from('products')
@@ -79,7 +79,7 @@ export default function WeddingCakesContent() {
       }));
 
       setCakes(prev => (append ? [...prev, ...formattedData] : formattedData));
-      setHasMore(formattedData.length === PAGE_SIZE);
+      setHasMore(formattedData.length === 6);
       setPage(pageToFetch);
     } catch (error) {
       console.error('Network or Initialization error fetching wedding cakes:', error);
@@ -95,28 +95,19 @@ export default function WeddingCakesContent() {
     fetchWeddingCakes(page + 1, true);
   }, [hasMore, page]);
 
-  // 🔥 Handle heart tap - increment rating by 0.1
   const handleHeartPress = async (productId: string, currentRating: number) => {
-    // Prevent multiple taps
-    if (likedProducts.has(productId)) {
-      return;
-    }
+    if (likedProducts.has(productId)) return;
 
     const newRating = Math.min(currentRating + 0.1, 10);
 
-    // Update UI immediately (optimistic update)
     setCakes(prevProducts =>
       prevProducts.map(product =>
-        product.id === productId
-          ? { ...product, rating: newRating }
-          : product
+        product.id === productId ? { ...product, rating: newRating } : product
       )
     );
 
-    // Mark as liked
     setLikedProducts(prev => new Set(prev).add(productId));
 
-    // Update in Supabase
     try {
       const { error } = await supabase
         .from('products')
@@ -126,12 +117,9 @@ export default function WeddingCakesContent() {
       if (error) throw error;
     } catch (error) {
       console.error('Error updating rating:', error);
-      // Revert if error
       setCakes(prevProducts =>
         prevProducts.map(product =>
-          product.id === productId
-            ? { ...product, rating: currentRating }
-            : product
+          product.id === productId ? { ...product, rating: currentRating } : product
         )
       );
       setLikedProducts(prev => {
@@ -151,21 +139,23 @@ export default function WeddingCakesContent() {
 
     const scale = scrollX.interpolate({
       inputRange,
-      outputRange: [0.88, 1.04, 0.88],
+      outputRange: [0.93, 1.0, 0.93],
       extrapolate: 'clamp',
     });
 
-    const imageSource =
-      item.image_urls?.length
-        ? { uri: item.image_urls[0] }
-        : undefined;
+    const opacity = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.75, 1.0, 0.75],
+      extrapolate: 'clamp',
+    });
 
+    const imageSource = item.image_urls?.length ? { uri: item.image_urls[0] } : undefined;
     const formattedPrice = `From KSh ${Number(item.price).toLocaleString()}`;
     const isLiked = likedProducts.has(item.id);
     const displayRating = item.rating || 0;
 
     return (
-      <Animated.View style={{ transform: [{ scale }] }}>
+      <Animated.View style={[styles.cardContainer, { transform: [{ scale }], opacity }]}>
         <TouchableOpacity
           style={styles.card}
           activeOpacity={0.95}
@@ -175,69 +165,53 @@ export default function WeddingCakesContent() {
           })}
         >
           <View style={styles.imageContainer}>
-            <Image
-              source={imageSource}
-              style={styles.cakeImage}
-              resizeMode="cover"
-            />
+            <Image source={imageSource} style={styles.cakeImage} resizeMode="cover" />
             <View style={styles.imageOverlay} />
+            
+            <TouchableOpacity
+              style={styles.heartBadge}
+              onPress={() => handleHeartPress(item.id, displayRating)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isLiked ? "heart" : "heart-outline"}
+                size={22}
+                color={isLiked ? "#ef4444" : "#1e293b"}
+              />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.details}>
-            <View style={styles.headerRow}>
-              <Text style={styles.productName} numberOfLines={1}>
-                {item.name}
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => handleHeartPress(item.id, displayRating)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={isLiked ? "heart" : "heart-outline"}
-                  size={24}
-                  color={isLiked ? "#ef4444" : "#64748b"}
-                />
-              </TouchableOpacity>
-            </View>
-
+            <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+            
             <Text style={styles.description} numberOfLines={2}>
-              {item.description || 'No description available.'}
+              {item.description || 'Custom crafted layout variant designed perfectly for your special timeline.'}
             </Text>
 
             <View style={styles.metaRow}>
               <View style={styles.ratingContainer}>
-                <Ionicons
-                  name="star"
-                  size={18}
-                  color="#fbbf24"
-                />
+                <Ionicons name="star" size={16} color="#fbbf24" />
                 <Text style={styles.rating}>{displayRating.toFixed(1)} / 10</Text>
               </View>
-            </View>
-
-            <View style={styles.priceRow}>
               <Text style={styles.price}>{formattedPrice}</Text>
-
-                <TouchableOpacity
-                  style={styles.bookButton}
-                  onPress={() => router.push({
-                    pathname: '../book',
-                    params: {
-                      id: item.id,
-                      name: item.name,
-                      price: item.price.toString(),
-                      image_urls: JSON.stringify(item.image_urls || []),
-                      seller_id: item.seller_id,
-                    }
-                  })}
-                >
-                  <Text style={styles.bookButtonText}>
-                    Book Now
-                  </Text>
-                </TouchableOpacity>
-
             </View>
+
+            <TouchableOpacity
+              style={styles.bookButton}
+              onPress={() => router.push({
+                pathname: '../book',
+                params: {
+                  id: item.id,
+                  name: item.name,
+                  price: item.price.toString(),
+                  image_urls: JSON.stringify(item.image_urls || []),
+                  seller_id: item.seller_id,
+                }
+              })}
+            >
+              <Text style={styles.bookButtonText}>Secure Date & Book Now</Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Animated.View>
@@ -246,34 +220,24 @@ export default function WeddingCakesContent() {
 
   if (loading && cakes.length === 0) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <ActivityIndicator size="small" color="#6b46c1" />
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#6b46c1" />
       </View>
     );
   }
 
   if (cakes.length === 0) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Text style={{ color: '#64748b', fontSize: 16, textAlign: 'center' }}>
-          No bookings available at the moment.
-        </Text>
-        <Text style={{ color: '#94a3b8', fontSize: 14, marginTop: 8 }}>
-          Check back later!
-        </Text>
+      <View style={[styles.container, styles.center, { paddingHorizontal: 32 }]}>
+        <Ionicons name="calendar-outline" size={64} color="#94a3b8" />
+        <Text style={styles.emptyTitle}>No custom slots available</Text>
+        <Text style={styles.emptySubtitle}>Check back shortly for new catalog updates.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Occasion Designs</Text>
-        <Text style={styles.subtitle}>
-          We've got you covered for birthdays, weddings, graduations & every celebration.
-        </Text>
-      </View>
-
       <Animated.FlatList
         data={cakes}
         renderItem={renderCake}
@@ -282,6 +246,7 @@ export default function WeddingCakesContent() {
         showsHorizontalScrollIndicator={false}
         snapToInterval={ITEM_WIDTH}
         decelerationRate="fast"
+        snapToAlignment="start"
         contentContainerStyle={styles.flatlistContent}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -304,47 +269,38 @@ export default function WeddingCakesContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff00',
+    backgroundColor: '#f8f4ff', // Changed from transparent to match header
   },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    marginTop: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  flatlistContent: {
-    paddingHorizontal: (width - CARD_WIDTH) / 2,
-    paddingVertical: 10,
-  },
-  footerLoading: {
-    width: 80,
+  center: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 40,
+  },
+  flatlistContent: {
+    paddingHorizontal: 8, // Minimal horizontal padding
+    alignItems: 'center',
+    paddingVertical: 4, // Minimal vertical padding
+  },
+  cardContainer: {
+    width: ITEM_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingVertical: 4, // Reduced padding
   },
   card: {
     width: CARD_WIDTH,
     backgroundColor: '#fff',
-    borderRadius: 28,
+    borderRadius: 20, // Slightly reduced
     overflow: 'hidden',
-    marginHorizontal: SPACING / 2,
+    elevation: 8,
     shadowColor: '#6b46c1',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 25,
-    elevation: 15,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
   },
   imageContainer: {
     width: '100%',
-    height: 235,
+    height: screenHeight * 0.35, // Slightly increased height for better proportion
     position: 'relative',
   },
   cakeImage: {
@@ -353,85 +309,92 @@ const styles = StyleSheet.create({
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(107,70,193,0.12)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.02)',
   },
-  badgeContainer: {
+  heartBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(107, 70, 193, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    top: 14,
+    right: 14,
+    backgroundColor: '#ffffffbf',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   details: {
-    padding: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    padding: 14, // Slightly reduced padding
   },
   productName: {
-    fontSize: 19,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
-    flex: 1,
-    marginRight: 10,
+    color: '#0f172a',
+    marginBottom: 4,
   },
   description: {
-    fontSize: 14.5,
+    fontSize: 13.5,
     color: '#64748b',
-    lineHeight: 21,
+    lineHeight: 19,
     marginBottom: 12,
+    height: 38,
   },
   metaRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 14, // Reduced
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 10, // Reduced
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   rating: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#1e293b',
-    marginLeft: 5,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
+    color: '#334155',
+    marginLeft: 4,
   },
   price: {
-    fontSize: 24,
+    fontSize: 18, // Slightly reduced
     fontWeight: '800',
     color: '#6b46c1',
   },
   bookButton: {
     backgroundColor: '#6b46c1',
-    paddingVertical: 13,
-    paddingHorizontal: 24,
-    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12, // Reduced
+    borderRadius: 12, // Reduced
+    gap: 6,
   },
   bookButtonText: {
     color: '#fff',
-    fontSize: 15.5,
+    fontSize: 14, // Slightly reduced
     fontWeight: '700',
+  },
+  footerLoading: {
+    width: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    color: '#64748b',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

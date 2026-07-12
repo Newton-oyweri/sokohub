@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 
 import CategoryTabs from './CategoryTabs';
-import ProductGrid from './ProductGrid';
 
 // Type definition for product from Supabase
 interface Product {
@@ -69,11 +68,7 @@ export default function MarketSection() {
 
   return (
     <View style={[styles.marketContainer, { paddingBottom: insets.bottom + 20 }]}>
-      <CategoryTabs 
-        marketItems={allProducts} 
-        onFiltersChange={handleFilterChange} 
-      />
-      <ProductGrid items={filteredItems} />
+      <CategoryTabs/>
     </View>
   );
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { router } from "expo-router";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -9,18 +9,24 @@ import {
   Platform,
   StatusBar,
   Image,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CakeCarousel from './Cakes/CakeCarousel';
-import Account from './Account/Account'; 
-import Header, { HEADER_HEIGHT } from '../../components/Header'; 
+import Account from './Account/Account';
+import Header, { HEADER_HEIGHT } from '../../components/Header';
 import { supabase } from '../../lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
+// This is now the ONLY route for this screen. Do not create a second
+// route file for Account — it is a tab of this shell, not a destination.
 export default function App() {
-  // Default is active tab set to 'cakes' (Shop)
-  const [activeTab, setActiveTab] = useState<'cakes' | 'account'>('cakes');
+  // Supports deep-linking straight to a tab, e.g. router.push("/(tabs)?tab=account")
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<'cakes' | 'account'>(
+    tab === 'account' ? 'account' : 'cakes'
+  );
 
   // Auth & Profile states
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -34,6 +40,33 @@ export default function App() {
 
   // Animated value tracker for scroll management
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Simple tab switch — no navigation, no stack push, just local state.
+  const handleAccountPress = () => {
+    setActiveTab('account');
+  };
+
+  const handleShopPress = () => {
+    setActiveTab('cakes');
+  };
+
+  // --- SMART HARDWARE BACK BUTTON ---
+  // On Account tab: back returns to Shop instead of leaving the screen/app.
+  // On Shop tab: back falls through to default behavior (exit app / pop stack).
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (activeTab === 'account') {
+          setActiveTab('cakes');
+          return true; // handled — block default back behavior
+        }
+        return false; // let the OS/navigator do its default thing
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [activeTab])
+  );
 
   // --- CORE AUTH LIFECYCLE ---
   useEffect(() => {
@@ -149,7 +182,7 @@ export default function App() {
 
       shakeIntervalRef.current = setInterval(() => {
         triggerBellShake();
-      }, 4000); 
+      }, 4000);
     } else {
       shakeAnimation.setValue(0);
     }
@@ -194,11 +227,11 @@ export default function App() {
       </View>
 
       {/* Main Scrollable Content */}
-      <Animated.ScrollView 
+      <Animated.ScrollView
         style={StyleSheet.absoluteFillObject}
         contentContainerStyle={[styles.scrollContent, { paddingTop: STATUS_BAR_HEIGHT }]}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]} 
+        stickyHeaderIndices={[1]}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true }
@@ -206,9 +239,9 @@ export default function App() {
         scrollEventThrottle={16}
       >
         {/* Dynamic Fading Greeting Row */}
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.greetingSpacer, 
+            styles.greetingSpacer,
             { height: HEADER_HEIGHT - 60, opacity: greetingOpacity }
           ]}
         >
@@ -220,11 +253,11 @@ export default function App() {
         {/* Premium Sticky Tabs */}
         <View style={styles.stickyTabsWrapper}>
           <View style={styles.tabsContainer}>
-            
+
             {/* Shop Tab */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.tabButton, activeTab === 'cakes' && styles.activeTabButton]}
-              onPress={() => setActiveTab('cakes')}
+              onPress={handleShopPress}
               activeOpacity={0.8}
             >
               <Ionicons
@@ -238,24 +271,24 @@ export default function App() {
             </TouchableOpacity>
 
             {/* Account Tab */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.tabButton, activeTab === 'account' && styles.activeTabButton]}
-              onPress={() => router.push("./Account")} // Route to target directory
+              onPress={handleAccountPress}
               activeOpacity={0.8}
             >
               {isLoggedIn && avatarUrl ? (
-                <Image 
-                  source={{ uri: avatarUrl }} 
+                <Image
+                  source={{ uri: avatarUrl }}
                   style={[
-                    styles.tabAvatar, 
+                    styles.tabAvatar,
                     activeTab === 'account' && styles.activeTabAvatar
-                  ]} 
+                  ]}
                 />
               ) : (
-                <Ionicons 
-                  name={activeTab === 'account' ? "person" : "person-outline"} 
-                  size={20} 
-                  color={activeTab === 'account' ? "#6b46c1" : "#9CA3AF"} 
+                <Ionicons
+                  name={activeTab === 'account' ? "person" : "person-outline"}
+                  size={20}
+                  color={activeTab === 'account' ? "#6b46c1" : "#9CA3AF"}
                 />
               )}
               <Text style={[styles.tabText, activeTab === 'account' && styles.activeTabText]}>
@@ -287,7 +320,7 @@ export default function App() {
             color={unreadCount > 0 ? "#6b46c1" : "#1F2937"}
           />
         </Animated.View>
-        
+
         {unreadCount > 0 && <View style={styles.badgeIndicator} />}
       </TouchableOpacity>
     </View>

@@ -14,6 +14,9 @@ import {
   Image,
   FlatList,
 } from 'react-native';
+
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -56,35 +59,49 @@ export default function BookWeddingCake() {
     fetchUserData();
   }, []);
 
-  const fetchUserData = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        setUser(null);
-        setProfile(null);
-        return;
-      }
 
-      setUser(user);
+// ...inside your component, replace fetchUserData with the useCallback version:
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name, phone, avatar_url')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to load profile');
-    } finally {
-      setLoading(false);
+const fetchUserData = useCallback(async () => {
+  try {
+    setLoading(true);
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      setUser(null);
+      setProfile(null);
+      return;
     }
-  };
+
+    setUser(user);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('full_name, phone, avatar_url')
+      .eq('id', user.id)
+      .single();
+
+    if (error) throw error;
+    setProfile(data);
+
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to load profile');
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+// Replace your old `useEffect(() => { fetchUserData(); }, [])` with this:
+useFocusEffect(
+  useCallback(() => {
+    fetchUserData();
+
+    return () => {
+      // runs when leaving the screen — add cleanup here if you need it later
+    };
+  }, [fetchUserData])
+);;
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'ios') {

@@ -12,6 +12,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
@@ -38,7 +39,8 @@ interface Order {
   };
 }
 
-export default function MyOrders({ onBack }: { onBack: () => void }) {
+export default function MyOrders() {
+  const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,45 +65,44 @@ export default function MyOrders({ onBack }: { onBack: () => void }) {
     }
   };
 
-const fetchOrders = async (uid: string) => {
-  try {
-    setLoading(true);
-    
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        products (
-          id,
-          name,
-          price,
-          image_urls,
-          seller_id
-        )
-      `)
-      .eq('customer_id', uid)
-      .eq('order_type', 'normalorder') // Add this line to filter only normal orders
-      .order('created_at', { ascending: false });
+  const fetchOrders = async (uid: string) => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          products (
+            id,
+            name,
+            price,
+            image_urls,
+            seller_id
+          )
+        `)
+        .eq('customer_id', uid)
+        .eq('order_type', 'normalorder')
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    setOrders(data || []);
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    Alert.alert('Error', 'Failed to load orders');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      Alert.alert('Error', 'Failed to load orders');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-const onRefresh = () => {
-  if (userId) {
-    setRefreshing(true);
-    fetchOrders(userId);
-  }
-};
+  const onRefresh = () => {
+    if (userId) {
+      setRefreshing(true);
+      fetchOrders(userId);
+    }
+  };
 
-  // Updated Status Config
   const getStatusConfig = (status: string) => {
     const statusMap: Record<string, { label: string; color: string }> = {
       pending: { label: 'Pending', color: '#f59e0b' },
@@ -115,7 +116,6 @@ const onRefresh = () => {
     return statusMap[status] || { label: status, color: '#64748b' };
   };
 
-  // Restrict ONLY cancelled orders from tracking
   const isTrackable = (status: string) => status !== 'cancelled';
 
   const formatDate = (dateString: string) => {
@@ -134,28 +134,24 @@ const onRefresh = () => {
 
     return (
       <View style={styles.orderCard} key={item.id}>
-        {/* Card Header: ID & Date */}
         <View style={styles.cardHeader}>
           <Text style={styles.orderId}>{item.order_number || item.id.slice(0, 8)}</Text>
           <Text style={styles.orderDate}>{formatDate(item.created_at)}</Text>
         </View>
 
         <View style={styles.cardContent}>
-          {/* Product Image */}
-        {imageUrl && (
-  <Image
-    source={{ uri: imageUrl }}
-    style={styles.productImage}
-  />
-)}
-          {/* Details */}
+          {imageUrl && (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.productImage}
+            />
+          )}
           <View style={styles.detailsContainer}>
             <Text style={styles.productName} numberOfLines={1}>
               {productName}
             </Text>
             <Text style={styles.priceText}>KSh {item.total_amount}</Text>
 
-            {/* Status Badge */}
             <View style={[styles.statusBadge, { backgroundColor: `${statusConfig.color}15` }]}>
               <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
               <Text style={[styles.statusText, { color: statusConfig.color }]}>
@@ -165,7 +161,6 @@ const onRefresh = () => {
           </View>
         </View>
 
-        {/* Dynamic Action Footer */}
         <View style={styles.cardFooter}>
           {isTrackable(item.status) ? (
             <TouchableOpacity 
@@ -175,7 +170,7 @@ const onRefresh = () => {
               ]}
               onPress={() => {
                 router.push({
-                  pathname: '../trackorder',
+                  pathname: '/trackorder',
                   params: { 
                     orderId: item.id,
                     orderNumber: item.order_number,
@@ -190,7 +185,7 @@ const onRefresh = () => {
                 style={styles.btnIcon} 
               />
               <Text style={item.status === 'delivered' ? styles.secondaryActionText : styles.primaryActionText}>
-           {item.status === 'delivered' ? 'Treat Delivered ' : 'Track My Treat'}
+                {item.status === 'delivered' ? 'Treat Delivered ' : 'Track My Treat'}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -206,10 +201,10 @@ const onRefresh = () => {
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={26} color="#1f2937" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1f2937" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Order History</Text>
         </View>
@@ -222,16 +217,19 @@ const onRefresh = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Fixed Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={26} color="#1f2937" />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order History</Text>
       </View>
 
+      {/* Scrollable Content */}
       <ScrollView
-        style={styles.listContent}
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -250,23 +248,55 @@ const onRefresh = () => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f4ff' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f4ff',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingTop: 12,              // Clean spacing below status bar
+    paddingBottom: 12,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    marginBottom: 16,
+    backgroundColor: '#f8f4ff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    zIndex: 10,
   },
-  backButton: { padding: 8, marginLeft: -8 },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#1f2937', marginLeft: 12 },
-  listContent: { padding: 16 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
-  loadingText: { marginTop: 12, fontSize: 16, color: '#64748b' },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 4,
+    borderRadius: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginLeft: 8,
+    paddingTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+  },
   orderCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
+    marginTop: 16,              // Space between header and first card
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -283,13 +313,42 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 12,
   },
-  orderId: { fontSize: 14, fontWeight: '700', color: '#64748b' },
-  orderDate: { fontSize: 13, color: '#94a3b8' },
-  cardContent: { flexDirection: 'row', alignItems: 'center' },
-  productImage: { width: 76, height: 76, borderRadius: 14, backgroundColor: '#f1f5f9' },
-  detailsContainer: { flex: 1, marginLeft: 16, justifyContent: 'center' },
-  productName: { fontSize: 16, fontWeight: '700', color: '#1f2937', marginBottom: 4 },
-  priceText: { fontSize: 15, fontWeight: '600', color: '#6b46c1', marginBottom: 8 },
+  orderId: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  orderDate: {
+    fontSize: 13,
+    color: '#94a3b8',
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+  },
+  detailsContainer: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  priceText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6b46c1',
+    marginBottom: 8,
+  },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,8 +357,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
-  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  statusText: { fontSize: 12, fontWeight: '700' },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   cardFooter: {
     marginTop: 14,
     borderTopWidth: 1,
@@ -314,13 +381,42 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     width: '100%',
   },
-  btnIcon: { marginRight: 6 },
-  primaryActionButton: { backgroundColor: '#6b46c1' },
-  primaryActionText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  secondaryActionButton: { backgroundColor: '#f3e8ff' },
-  secondaryActionText: { color: '#6b46c1', fontSize: 14, fontWeight: '600' },
-  cancelledActionButton: { backgroundColor: '#fef2f2' },
-  cancelledActionText: { color: '#ef4444', fontSize: 14, fontWeight: '600' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
-  emptyText: { marginTop: 12, fontSize: 16, color: '#64748b', fontWeight: '500' },
+  btnIcon: {
+    marginRight: 6,
+  },
+  primaryActionButton: {
+    backgroundColor: '#6b46c1',
+  },
+  primaryActionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  secondaryActionButton: {
+    backgroundColor: '#f3e8ff',
+  },
+  secondaryActionText: {
+    color: '#6b46c1',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cancelledActionButton: {
+    backgroundColor: '#fef2f2',
+  },
+  cancelledActionText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 80,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
+  },
 });

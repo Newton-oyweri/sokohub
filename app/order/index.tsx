@@ -19,17 +19,19 @@ import ProductDisplay from './display';
 
 const DEFAULT_PRODUCT = {
   id: 'default',
-  seller_id: 'default', // Added seller_id
+  seller_id: 'default', 
   name: 'Wonderland Special',
   price: 500,
   description: 'Rich layers with premium sweet cream icing',
   image_urls: ['https://via.placeholder.com/400x300/6b46c1/ffffff?text=Wonderland'],
 };
 
+const KIBABII_ADDRESS = 'Bungoma, Kibabii opposite main gate';
+
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  
+
   const product = useMemo(() => {
     if (params.id) {
       let imageUrls: string[] = [];
@@ -52,7 +54,7 @@ export default function OrderScreen() {
 
       return {
         id: params.id as string || 'default',
-        seller_id: params.seller_id as string || DEFAULT_PRODUCT.seller_id, // Added seller_id extraction
+        seller_id: params.seller_id as string || DEFAULT_PRODUCT.seller_id, 
         name: params.name as string || DEFAULT_PRODUCT.name,
         price: parseFloat(params.price as string) || DEFAULT_PRODUCT.price,
         description: params.description as string || DEFAULT_PRODUCT.description,
@@ -65,9 +67,8 @@ export default function OrderScreen() {
   const [quantity, setQuantity] = useState(1);
   const [customWriting, setCustomWriting] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  
-  const [isPickup, setIsPickup] = useState(false);
-  const [isDoorDelivery, setIsDoorDelivery] = useState(false);
+  const [isKibabiiSelected, setIsKibabiiSelected] = useState(false);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
@@ -81,48 +82,51 @@ export default function OrderScreen() {
     ? params.sellerId
     : typeof params.seller_id === 'string'
       ? params.seller_id
-      : product.seller_id || ''; // Fallback to product's seller_id
+      : product.seller_id || ''; 
 
   const cakePricePerUnit = product.price;
-  const serviceFee = isDoorDelivery ? 150 : 0; 
+  const serviceFee = 0;
   const subtotal = cakePricePerUnit * quantity;
   const totalPrice = subtotal + serviceFee;
+
+  // Deriving active fulfillment configurations implicitly from selection state
+  const fulfillmentMethod = isKibabiiSelected ? 'pickup' : 'door_delivery';
+  const displayAddress = isKibabiiSelected ? KIBABII_ADDRESS : deliveryAddress;
 
   const handleIncrement = () => setQuantity(prev => prev + 1);
   const handleDecrement = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
 
-  const selectPickup = () => {
-    setIsPickup(true);
-    setIsDoorDelivery(false);
+  const toggleKibabiiPoint = () => {
+    if (isKibabiiSelected) {
+      setIsKibabiiSelected(false);
+    } else {
+      setIsKibabiiSelected(true);
+      setDeliveryAddress(''); // Clear out manually entered text when opting for pickup
+    }
   };
 
-  const selectDoorDelivery = () => {
-    setIsDoorDelivery(true);
-    setIsPickup(false);
-    if (!deliveryAddress) {
-      setDeliveryAddress('House 24, Greenview Apartments, Off Ngong Road, Near Naivas Prestige, Kilimani, Nairobi. Call on arrival: 0712 345 678.');
+  const handleAddressChange = (text: string) => {
+    if (isKibabiiSelected) {
+      setIsKibabiiSelected(false);
     }
+    setDeliveryAddress(text);
   };
 
   const triggerCheckoutModal = () => {
-    if (!isPickup && !isDoorDelivery) {
-      Alert.alert('Selection Required', 'Please select either Pickup Location or Door Delivery.');
-      return;
-    }
-    if (isDoorDelivery && !deliveryAddress.trim()) {
-      Alert.alert('Address Required', 'Please provide an address for door delivery.');
+    if (fulfillmentMethod === 'door_delivery' && !deliveryAddress.trim()) {
+      Alert.alert('Address Required', 'Please provide an address for door delivery or select self-pickup.');
       return;
     }
     setIsModalVisible(true);
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContainer, { paddingBottom: 140 }]}
       >
         <ProductDisplay product={product} />
@@ -141,7 +145,7 @@ export default function OrderScreen() {
           />
           <Text style={styles.charCount}>{customWriting.length}/50</Text>
         </View>
-        
+
         {/* Quantity Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quantity</Text>
@@ -156,54 +160,37 @@ export default function OrderScreen() {
           </View>
         </View>
 
-        {/* Fulfillment Method */}
-        <View style={styles.deliveryHeader}>
+        {/* Delivery Coverage Banner */}
+        <View style={styles.deliveryBanner}>
           <Ionicons name="bicycle-outline" size={22} color="#6b46c1" />
-          <Text style={styles.sectionTitle}>How would you like your order?</Text>
+          <Text style={styles.deliveryBannerText}>
+            Same day fast deliveries in Kisii, Nairobi, Bungoma & Nakuru
+          </Text>
         </View>
 
-        {/* Pickup Choice */}
-        <TouchableOpacity 
-          style={[styles.fulfillmentOption, isPickup && styles.activeOptionBorder]} 
-          onPress={selectPickup}
+        {/* Quick Pickup Point Selector */}
+        <TouchableOpacity
+          style={[styles.quickPointRow, isKibabiiSelected && styles.quickPointRowActive]}
+          onPress={toggleKibabiiPoint}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name={isPickup ? "checkbox" : "square-outline"} 
-            size={24} 
-            color={isPickup ? "#6b46c1" : "#94a3b8"} 
-          />
-          <View style={styles.optionTextContainer}>
-            <Text style={styles.locationName}>Pickup Location</Text>
-            <Text style={styles.locationDetail}>Bungoma, Kibabii (Opposite Main Gate)</Text>
+          <View style={[styles.checkbox, isKibabiiSelected && styles.checkboxChecked]}>
+            {isKibabiiSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </View>
+          <View style={styles.quickPointTextWrap}>
+            <Text style={styles.quickPointLabel}>Bungoma, Kibabii opposite main gate</Text>
+            <Text style={styles.quickPointSubtitle}>Tap here to select as Self-Pickup point</Text>
           </View>
         </TouchableOpacity>
 
-        {/* Door Delivery Choice */}
-        <TouchableOpacity 
-          style={[styles.fulfillmentOption, isDoorDelivery && styles.activeOptionBorder, { marginTop: 12 }]}
-          onPress={selectDoorDelivery}
-          activeOpacity={0.8}
-        >
-          <Ionicons 
-            name={isDoorDelivery ? "checkbox" : "square-outline"} 
-            size={24} 
-            color={isDoorDelivery ? "#6b46c1" : "#94a3b8"} 
-          />
-          <View style={styles.optionTextContainer}>
-            <Text style={styles.toggleTitle}>Door Delivery</Text>
-            <Text style={styles.toggleSubtitle}>Delivery directly to your location</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Dynamic Custom Address Field */}
-        {isDoorDelivery && (
+        {/* Conditional Field: Only display text fields for standard deliveries */}
+        {!isKibabiiSelected && (
           <View style={styles.addressInputContainer}>
             <TextInput
               style={styles.addressInput}
               value={deliveryAddress}
-              onChangeText={setDeliveryAddress}
-              placeholder="Enter specific layout steps, house numbers, or landmarks..."
+              onChangeText={handleAddressChange}
+              placeholder="Enter your address here ..."
               placeholderTextColor="#94a3b8"
               multiline
               numberOfLines={4}
@@ -218,29 +205,33 @@ export default function OrderScreen() {
           </View>
         )}
 
-        {/* Actual Dynamic Selected Location Block */}
-        {(isPickup || isDoorDelivery) && (
-          <View style={[styles.deliveryBox, { marginTop: 24 }]}>
-            <View style={styles.deliveryRow}>
-              <View style={styles.deliveryIconRow}>
-                <Ionicons name={isPickup ? "location" : "home"} size={18} color="#64748b" />
-                <Text style={styles.deliveryLabel}>Destination</Text>
-              </View>
-              <Text style={styles.deliveryValue} numberOfLines={3}>
-                {isPickup ? 'Bungoma, Kibabii (Opposite Main Gate)' : (deliveryAddress || 'No address provided yet')}
+        {/* Selected Location Block */}
+        <View style={[styles.deliveryBox, { marginTop: 24 }]}>
+          <View style={styles.deliveryRow}>
+            <View style={styles.deliveryIconRow}>
+              <Ionicons 
+                name={fulfillmentMethod === 'pickup' ? "location" : "home"} 
+                size={18} 
+                color="#64748b" 
+              />
+              <Text style={styles.deliveryLabel}>
+                {fulfillmentMethod === 'pickup' ? 'Pickup Spot' : 'Destination'}
               </Text>
             </View>
-            <View style={styles.deliveryRow}>
-              <View style={styles.deliveryIconRow}>
-                <Ionicons name="card-outline" size={18} color="#64748b" />
-                <Text style={styles.deliveryLabel}>Service Fee</Text>
-              </View>
-              <Text style={styles.deliveryValue}>
-                {isDoorDelivery ? `KSh ${serviceFee}` : 'Free'}
-              </Text>
-            </View>
+            <Text style={styles.deliveryValue} numberOfLines={3}>
+              {displayAddress || 'No address provided yet'}
+            </Text>
           </View>
-        )}
+          <View style={styles.deliveryRow}>
+            <View style={styles.deliveryIconRow}>
+              <Ionicons name="card-outline" size={18} color="#64748b" />
+              <Text style={styles.deliveryLabel}>Service Fee</Text>
+            </View>
+            <Text style={styles.deliveryValue}>
+              KSh {serviceFee}
+            </Text>
+          </View>
+        </View>
 
         {/* Bill Summary */}
         <View style={styles.billingSection}>
@@ -251,7 +242,7 @@ export default function OrderScreen() {
           </View>
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Service Fee</Text>
-            <Text style={styles.billValue}>{isDoorDelivery ? `KSh ${serviceFee}` : 'KSh 0'}</Text>
+            <Text style={styles.billValue}>KSh {serviceFee}</Text>
           </View>
           <View style={[styles.billRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total Amount</Text>
@@ -262,18 +253,18 @@ export default function OrderScreen() {
 
       {/* Footer System Panel */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <TouchableOpacity 
-          style={[styles.checkoutButton, (!isPickup && !isDoorDelivery) && styles.disabledCheckoutButton]}
+        <TouchableOpacity
+          style={styles.checkoutButton}
           activeOpacity={0.8}
           onPress={triggerCheckoutModal}
         >
           <Text style={styles.checkoutButtonText}>
-            {(!isPickup && !isDoorDelivery) ? "Select Delivery Method" : `Confirm Order · KSh ${totalPrice}`}
+            {`Confirm Order · KSh ${totalPrice}`}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ConfirmOrder 
+      <ConfirmOrder
         isVisible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         onAuthRequired={() => Alert.alert('Authentication required', 'Please sign in to continue.')}
@@ -281,25 +272,24 @@ export default function OrderScreen() {
           id: product.id,
           name: product.name,
           price: product.price,
-          seller_id: product.seller_id, // Pass seller_id from product
+          seller_id: product.seller_id,
         }}
         quantity={quantity}
         customWriting={customWriting}
-        fulfillmentMethod={isDoorDelivery ? 'door_delivery' : 'pickup'}
-        deliveryAddress={deliveryAddress}
+        fulfillmentMethod={fulfillmentMethod}
+        deliveryAddress={displayAddress}
         totalPrice={totalPrice}
         isLoading={isLoading}
         setIsLoading={setIsLoading}
         receiptNumber={receiptNumber}
         setReceiptNumber={setReceiptNumber}
         customerId={customerId}
-        sellerId={sellerId || product.seller_id || ''} // Use sellerId from params or product
+        sellerId={sellerId || product.seller_id || ''}
       />
     </KeyboardAvoidingView>
   );
 }
 
-// ... (styles remain the same)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f4ff' },
   scrollContainer: { padding: 20 },
@@ -311,15 +301,16 @@ const styles = StyleSheet.create({
   counterContainer: { alignItems: 'center', backgroundColor: '#fff', alignSelf: 'flex-start', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', flexDirection: 'row' },
   counterBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#f1f5f9' },
   counterValue: { paddingHorizontal: 24, fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  deliveryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 8 },
-  fulfillmentOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', gap: 12 },
-  activeOptionBorder: { borderColor: '#6b46c1', backgroundColor: '#fdfbff' },
-  optionTextContainer: { flex: 1 },
-  locationName: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  locationDetail: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  toggleTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  toggleSubtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  addressInputContainer: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', marginTop: 12, overflow: 'hidden' },
+  deliveryBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fdfbff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 16, marginBottom: 12 },
+  deliveryBannerText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#0f172a', lineHeight: 20 },
+  quickPointRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', padding: 14, marginBottom: 12, gap: 12 },
+  quickPointRowActive: { borderColor: '#6b46c1', backgroundColor: '#faf9fe' },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  checkboxChecked: { backgroundColor: '#6b46c1', borderColor: '#6b46c1' },
+  quickPointTextWrap: { flex: 1 },
+  quickPointLabel: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  quickPointSubtitle: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
+  addressInputContainer: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
   addressInput: { paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#0f172a', minHeight: 90, textAlignVertical: 'top' },
   addressSample: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9', gap: 8, backgroundColor: '#faf9fe' },
   addressSampleText: { fontSize: 12, color: '#7c3aed', flex: 1, lineHeight: 17, fontWeight: '500' },
@@ -337,6 +328,5 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 18, fontWeight: '800', color: '#6b46c1' },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   checkoutButton: { backgroundColor: '#6b46c1', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-  disabledCheckoutButton: { backgroundColor: '#cbd5e1' },
   checkoutButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

@@ -12,29 +12,23 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../../../lib/supabase'; // Adjust this import path relative to your file system
+import { router } from 'expo-router';
+import { supabase } from '../../../../lib/supabase';
 
-// Preset Avatars from your Supabase Storage Bucket
 const AVATARS = [
   { id: 'male', url: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/profile_avatar/maleavatar.jfif' },
   { id: 'female', url: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/profile_avatar/femaleavatar.png' }
 ];
 
-export default function UserProfile({ onBack }: { onBack: () => void }) {
+export default function UserProfile() {
   const insets = useSafeAreaInsets();
-
-  // Lifecycle States
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-
-  // States matching your public.profiles table schema
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(AVATARS[0].url);
-
-  // Track if the user has triggered avatar choosing mode while editing
   const [isChoosingAvatar, setIsChoosingAvatar] = useState(false);
 
   useEffect(() => {
@@ -44,51 +38,39 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
   const fetchUserProfile = async () => {
     try {
       setIsLoading(true);
-      
-      // 1. Get the current logged-in authenticated user session
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
       if (authError || !user) {
-        Alert.alert('Authentication Error', 'Please log in to manage your profile.');
-        onBack();
+        Alert.alert('Error', 'Please log in to manage your profile.');
+        router.back();
         return;
       }
-
       setUserId(user.id);
 
-      // 2. Fetch profile from public.profiles schema table
-      const { data, error, status } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('full_name, phone, avatar_url')
         .eq('id', user.id)
         .single();
 
-      if (error && status !== 406) {
-        throw error;
-      }
-
-      if (data) {
+      if (!error && data) {
         setName(data.full_name || '');
         setPhone(data.phone || '');
         setAvatarUrl(data.avatar_url || AVATARS[0].url);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'An error occurred fetching your profile data.');
+      Alert.alert('Error', error.message || 'Failed to fetch profile.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!userId) return;
-
-    if (!name.trim() || !phone.trim()) {
-      Alert.alert('Validation Error', 'All personal details are required for deliveries.');
+    if (!userId || !name.trim() || !phone.trim()) {
+      Alert.alert('Validation Error', 'All fields are required.');
       return;
     }
 
     setIsSaving(true);
-
     try {
       const { error } = await supabase
         .from('profiles')
@@ -97,16 +79,15 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
           full_name: name.trim(),
           phone: phone.trim(),
           avatar_url: avatarUrl,
-          created_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
-
       Alert.alert('Success', 'Profile updated successfully.');
       setIsEditing(false);
       setIsChoosingAvatar(false);
     } catch (error: any) {
-      Alert.alert('Save Error', error.message || 'Failed to update backend profile.');
+      Alert.alert('Error', error.message || 'Failed to update profile.');
     } finally {
       setIsSaving(false);
     }
@@ -115,7 +96,7 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
   const handleCancel = () => {
     setIsEditing(false);
     setIsChoosingAvatar(false);
-    fetchUserProfile(); // Restores original database entries
+    fetchUserProfile();
   };
 
   if (isLoading) {
@@ -127,134 +108,139 @@ export default function UserProfile({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <ScrollView 
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Fixed Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton} disabled={isSaving}>
-          <Ionicons name="arrow-back" size={26} color="#1f2937" />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
       </View>
 
-      {/* Dynamic Avatar UI Section */}
-      <View style={styles.profileSection}>
-        {isEditing && isChoosingAvatar ? (
-          /* Avatar selector shown inside the screen instead of the original image */
-          <View style={styles.selectorContainer}>
-            <Text style={styles.selectorTitle}>Choose Avatar</Text>
-            <View style={styles.avatarGrid}>
-              {AVATARS.map((avatar) => (
-                <TouchableOpacity 
-                  key={avatar.id} 
-                  onPress={() => {
-                    setAvatarUrl(avatar.url);
-                    setIsChoosingAvatar(false); // Snap back to view selected avatar
-                  }}
-                  style={[
-                    styles.gridAvatarWrapper, 
-                    avatarUrl === avatar.url && styles.selectedGridAvatar
-                  ]}
-                >
-                  <Image source={{ uri: avatar.url }} style={styles.gridAvatarImage} />
-                </TouchableOpacity>
-              ))}
+      {/* Scrollable Content */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Avatar Section */}
+        <View style={styles.profileSection}>
+          {isEditing && isChoosingAvatar ? (
+            <View style={styles.selectorContainer}>
+              <Text style={styles.selectorTitle}>Choose Avatar</Text>
+              <View style={styles.avatarGrid}>
+                {AVATARS.map((avatar) => (
+                  <TouchableOpacity 
+                    key={avatar.id} 
+                    onPress={() => {
+                      setAvatarUrl(avatar.url);
+                      setIsChoosingAvatar(false);
+                    }}
+                    style={[
+                      styles.gridAvatarWrapper, 
+                      avatarUrl === avatar.url && styles.selectedGridAvatar
+                    ]}
+                  >
+                    <Image source={{ uri: avatar.url }} style={styles.gridAvatarImage} />
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.avatarContainer} 
+              onPress={() => isEditing && setIsChoosingAvatar(true)}
+              disabled={!isEditing}
+            >
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+              {isEditing && (
+                <View style={styles.editBadge}>
+                  <Ionicons name="camera" size={16} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          {!isChoosingAvatar && (
+            <>
+              <Text style={styles.userName}>{name.trim() || 'New User'}</Text>
+              {isEditing && (
+                <Text style={styles.changeHint}>Tap avatar to change</Text>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Profile Form */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Personal Information</Text>
+          
+          <View style={styles.field}>
+            <Text style={styles.label}>Full Name</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Enter full name"
+                placeholderTextColor="#94a3b8"
+                editable={!isSaving}
+              />
+            ) : (
+              <Text style={styles.value}>{name || 'Not set'}</Text>
+            )}
+          </View>
+
+          <View style={[styles.field, styles.lastField]}>
+            <Text style={styles.label}>Phone Number</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                placeholder="Enter phone number"
+                placeholderTextColor="#94a3b8"
+                editable={!isSaving}
+              />
+            ) : (
+              <Text style={styles.value}>{phone || 'Not set'}</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Actions */}
+        {isEditing ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity 
+              style={[styles.btn, styles.cancelBtn]} 
+              onPress={handleCancel}
+              disabled={isSaving}
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.btn, styles.saveBtn]} 
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save</Text>
+              )}
+            </TouchableOpacity>
           </View>
         ) : (
-          /* Normal viewing / editing mode showing avatar picture */
           <TouchableOpacity 
-            style={styles.avatarContainer} 
-            onPress={() => isEditing && setIsChoosingAvatar(true)}
-            disabled={!isEditing || isSaving}
+            style={styles.editBtn} 
+            onPress={() => setIsEditing(true)}
           >
-            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            <Text style={styles.editBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         )}
-        
-        {!isChoosingAvatar && (
-          <>
-            <Text style={styles.userName}>{name.trim() || 'New User'}</Text>
-            {isEditing && (
-              <Text style={styles.changeHint}>Tap image to change avatar</Text>
-            )}
-          </>
-        )}
-      </View>
-
-      {/* Personal Information Form */}
-      <View style={styles.infoCard}>
-        <Text style={styles.sectionTitle}>Personal Information</Text>
-        
-        {/* Full Name Row */}
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Full Name</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter full name"
-              editable={!isSaving}
-            />
-          ) : (
-            <Text style={styles.value}>{name || 'Not Set'}</Text>
-          )}
-        </View>
-
-        {/* Phone Number Row */}
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Phone Number</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="Enter phone number"
-              editable={!isSaving}
-            />
-          ) : (
-            <Text style={styles.value}>{phone || 'Not Set'}</Text>
-          )}
-        </View>
-      </View>
-
-      {/* Action Controller Buttons */}
-      {isEditing ? (
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={[styles.btn, styles.cancelButton]} 
-            onPress={handleCancel}
-            disabled={isSaving}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.btn, styles.saveButton]} 
-            onPress={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity 
-          style={styles.editButton} 
-          onPress={() => setIsEditing(true)}
-        >
-          <Text style={styles.editButtonText}>Edit Profile</Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -267,45 +253,74 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
-    padding: 16,
-    marginBottom: "90%",
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f4ff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    zIndex: 10,
   },
   backButton: {
     padding: 8,
     marginLeft: -8,
+    marginRight: 4,
+    borderRadius: 12,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
     color: '#1f2937',
     marginLeft: 12,
+    paddingTop: 2,
   },
   profileSection: {
     alignItems: 'center',
-    marginBottom: 32,
-    minHeight: 160,
-    justifyContent: 'center',
+    marginBottom: 24,
+    marginTop: 16,
   },
   avatarContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#e0d9ff',
+    backgroundColor: '#ede9fe',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
     overflow: 'hidden',
+    position: 'relative',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: '#6b46c1',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
   },
   changeHint: {
     fontSize: 13,
@@ -313,26 +328,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 4,
   },
-  userName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  /* Embedded Choose Avatar Panel styles */
   selectorContainer: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    padding: 16,
+    padding: 20,
     width: '100%',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2d9ff',
+    borderColor: '#ede9fe',
+    marginBottom: 12,
   },
   selectorTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#6b46c1',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   avatarGrid: {
     flexDirection: 'row',
@@ -353,72 +363,67 @@ const styles = StyleSheet.create({
     height: 76,
     borderRadius: 38,
   },
-  /* Card Layouts */
-  infoCard: {
+  card: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 10,
-    elevation: 4,
+    elevation: 3,
   },
-  sectionTitle: {
+  cardTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  field: {
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f1f1',
-    minHeight: 60,
+    borderBottomColor: '#f1f5f9',
+  },
+  lastField: {
+    borderBottomWidth: 0,
   },
   label: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#64748b',
-    flex: 1,
+    marginBottom: 4,
   },
   value: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
-    textAlign: 'right',
-    flex: 2,
   },
   input: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#6b46c1',
+    color: '#1f2937',
     backgroundColor: '#f8f6ff',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 8,
-    textAlign: 'right',
-    flex: 2,
     borderWidth: 1,
-    borderColor: '#e2d9ff',
+    borderColor: '#ede9fe',
+    marginTop: 2,
   },
-  editButton: {
+  editBtn: {
     backgroundColor: '#6b46c1',
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 24,
   },
-  editButtonText: {
+  editBtnText: {
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
   },
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
     marginTop: 24,
   },
   btn: {
@@ -428,19 +433,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelButton: {
+  cancelBtn: {
     backgroundColor: '#f1f5f9',
-    marginRight: 12,
   },
-  cancelButtonText: {
+  cancelBtnText: {
     color: '#64748b',
     fontSize: 17,
     fontWeight: '700',
   },
-  saveButton: {
+  saveBtn: {
     backgroundColor: '#10b981',
   },
-  saveButtonText: {
+  saveBtnText: {
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',

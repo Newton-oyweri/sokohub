@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router'; // ✅ Added router import
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -18,14 +19,14 @@ import { DepositModal } from './wallet/components/Deposit';
 import { TransactionList } from './wallet/components/transactions';
 
 // Import types
-import { Transaction, WalletScreenProps } from '../../../../components/wallet.types';
+import { Transaction } from '../../../../components/wallet.types'; // ✅ Removed WalletScreenProps
 
 // Import services
 import { walletService } from './wallet/services/walletService';
 
 const BACKEND_URL = 'https://sokohubbackend.onrender.com';
 
-export default function Wallet({ onBack }: WalletScreenProps) {
+export default function Wallet() { // ✅ Removed onBack prop
   const insets = useSafeAreaInsets();
 
   // Core State
@@ -125,6 +126,15 @@ export default function Wallet({ onBack }: WalletScreenProps) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Fixed Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>My Wallet</Text>
+      </View>
+
+      {/* Scrollable Content */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
@@ -133,14 +143,6 @@ export default function Wallet({ onBack }: WalletScreenProps) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6b46c1']} />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1f2937" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Wallet</Text>
-        </View>
-
         {/* Balance Card */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
@@ -212,24 +214,33 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingTop: 8,
+    paddingTop: 12,              // Clean spacing below status bar
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f4ff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    zIndex: 10,
   },
   backButton: {
     padding: 8,
     marginLeft: -8,
+    marginRight: 4,
+    borderRadius: 12,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
     color: '#1f2937',
     marginLeft: 8,
+    paddingTop: 2,
   },
   balanceCard: {
     backgroundColor: '#6b46c1',
     borderRadius: 20,
     paddingVertical: 28,
     paddingHorizontal: 24,
+    marginTop: 16,              // Space between header and balance card
     marginBottom: 24,
     shadowColor: '#6b46c1',
     shadowOffset: { width: 0, height: 8 },
