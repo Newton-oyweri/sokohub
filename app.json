@@ -13,6 +13,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "sokohub",
     "userInterfaceStyle": "automatic",
+    "platforms": ["android"],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
@@ -52,6 +53,16 @@
           "image": "./assets/images/notification-icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+            [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "useLegacyPackaging": true
+          }
         }
       ],
       [
