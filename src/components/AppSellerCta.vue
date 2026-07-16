@@ -12,12 +12,15 @@
     <div v-else class="form-content">
       <div class="form-header">
         <h3>Seller Application</h3>
-        <span class="step-indicator">Step {{ currentStep }} of 2</span>
+        <span class="step-indicator">Step {{ currentStep }} of 3</span>
       </div>
 
       <!-- Submission success message -->
       <div v-if="submitSuccess" class="success-box">
-        <p>Thank you! Your application has been submitted and is pending review.</p>
+        <div class="success-icon">✓</div>
+        <h4>Application Received!</h4>
+        <p>Thank you for applying to partner with WonderBakes. Your submission has been successfully transmitted to our onboarding queue.</p>
+        <p class="callback-notice">Our compliance and account management team will review your credentials and call you back on your provided phone number <strong>within one business day</strong>.</p>
         <button class="btn btn-secondary" @click="resetForm">Close</button>
       </div>
 
@@ -28,8 +31,27 @@
           {{ submitError }}
         </div>
 
-        <!-- STEP 1: Basic & Business Info -->
+        <!-- STEP 1: Mandatory Legal & Compliance Gate -->
         <div v-if="currentStep === 1" class="step-fields">
+          <div class="gate-notice">
+            <h4>Review Terms & Privacy</h4>
+            <p>To maintain a safe, trusted ecosystem for buyers and artisans, all prospective merchants are required to review and accept our baseline legal policies before beginning the application process.</p>
+          </div>
+          
+          <div class="agreement-box gate-agreements">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="form.agreedTerms" />
+              <span>I have read and agree to the binding <router-link to="/seller-terms" target="_blank">Seller Terms and Conditions</router-link> *</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="form.agreedPrivacy" />
+              <span>I have read and agree to the <router-link to="/privacy-policy" target="_blank">Privacy Policy</router-link> regarding my data *</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- STEP 2: Basic & Business Info -->
+        <div v-if="currentStep === 2" class="step-fields">
           <div class="form-row">
             <div class="form-group">
               <label for="businessName">Business Name *</label>
@@ -66,8 +88,8 @@
           </div>
         </div>
 
-        <!-- STEP 2: Location, ID, Payments & Agreements -->
-        <div v-if="currentStep === 2" class="step-fields">
+        <!-- STEP 3: Location, ID, Payments & Description -->
+        <div v-if="currentStep === 3" class="step-fields">
           <div class="form-row">
             <div class="form-group">
               <label for="county">County/City *</label>
@@ -105,18 +127,6 @@
             <label for="description">Short Bio / Description (Optional)</label>
             <textarea id="description" v-model="form.description" rows="2" placeholder="Tell customers about your shop..."></textarea>
           </div>
-
-          <!-- Agreements -->
-          <div class="agreement-box">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="form.agreedTerms" required />
-              <span>I agree to the <router-link to="/seller-terms" target="_blank">Seller Terms and Conditions</router-link> *</span>
-            </label>
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="form.agreedPrivacy" required />
-              <span>I agree to the <router-link to="/privacy-policy" target="_blank">Privacy Policy</router-link> *</span>
-            </label>
-          </div>
         </div>
 
         <!-- Navigation Actions -->
@@ -125,11 +135,15 @@
             {{ currentStep === 1 ? 'Cancel' : 'Back' }}
           </button>
 
-          <button type="button" v-if="currentStep === 1" @click="currentStep = 2" class="btn btn-primary ml-auto">
+          <button type="button" v-if="currentStep === 1" :disabled="!isGatePassed" @click="currentStep = 2" class="btn btn-primary ml-auto">
             Next Step
           </button>
 
-          <button type="submit" v-if="currentStep === 2" :disabled="!isFormValid || isSubmitting" class="btn btn-success ml-auto">
+          <button type="button" v-if="currentStep === 2" @click="currentStep = 3" class="btn btn-primary ml-auto">
+            Next Step
+          </button>
+
+          <button type="submit" v-if="currentStep === 3" :disabled="isSubmitting" class="btn btn-success ml-auto">
             {{ isSubmitting ? 'Submitting...' : 'Submit Application' }}
           </button>
         </div>
@@ -168,9 +182,12 @@ const form = reactive({
   agreedPrivacy: false
 })
 
-// --- Draft persistence (sessionStorage) ---
-// Restore any in-progress draft on mount, so a reload or the browser
-// tossing an inactive tab doesn't wipe what the user typed.
+// Check if they completed the legal step requirements
+const isGatePassed = computed(() => {
+  return form.agreedTerms && form.agreedPrivacy
+})
+
+// Restore working draft states
 onMounted(() => {
   const saved = sessionStorage.getItem(STORAGE_KEY)
   if (saved) {
@@ -178,7 +195,7 @@ onMounted(() => {
       const parsed = JSON.parse(saved)
       Object.assign(form, parsed.form)
       currentStep.value = parsed.currentStep || 1
-      isRegistering.value = true // re-open the form if there's a draft
+      isRegistering.value = true
     } catch (err) {
       console.error('Failed to restore seller form draft:', err)
       sessionStorage.removeItem(STORAGE_KEY)
@@ -186,7 +203,7 @@ onMounted(() => {
   }
 })
 
-// Save on every change to form fields or step
+// Auto-save changes 
 watch(
   [form, currentStep],
   () => {
@@ -204,21 +221,17 @@ const clearDraft = () => {
   sessionStorage.removeItem(STORAGE_KEY)
 }
 
-const isFormValid = computed(() => {
-  return form.agreedTerms && form.agreedPrivacy
-})
-
 const goBack = () => {
   if (currentStep.value === 1) {
-    isRegistering.value = false // collapse back to original CTA style
+    isRegistering.value = false
     clearDraft()
   } else {
-    currentStep.value = 1
+    currentStep.value -= 1
   }
 }
 
 const submitForm = async () => {
-  if (!isFormValid.value || isSubmitting.value) return
+  if (!isGatePassed.value || isSubmitting.value) return
 
   isSubmitting.value = true
   submitError.value = null
@@ -277,7 +290,6 @@ const resetForm = () => {
 }
 </script>
 
-
 <style scoped>
 .seller-cta {
   background: #fdf6ff;
@@ -290,7 +302,6 @@ const resetForm = () => {
   margin: 0 auto;
 }
 
-/* Transform layout parameters when form is active */
 .seller-cta.form-active {
   background: #ffffff;
   border-style: solid;
@@ -313,7 +324,6 @@ const resetForm = () => {
   line-height: 1.6;
 }
 
-/* Form Styles */
 .form-header {
   display: flex;
   justify-content: space-between;
@@ -336,6 +346,33 @@ const resetForm = () => {
   padding: 4px 10px;
   border-radius: 20px;
   font-weight: bold;
+}
+
+.gate-notice {
+  margin-bottom: 20px;
+  background: #fcf8ff;
+  padding: 15px;
+  border-left: 4px solid #9c27b0;
+  border-radius: 0 6px 6px 0;
+}
+
+.gate-notice h4 {
+  margin: 0 0 6px 0;
+  color: #4a148c;
+  font-size: 1rem;
+}
+
+.gate-notice p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #555;
+  text-align: left;
+}
+
+.gate-agreements {
+  border: 1px solid #e1bee7 !important;
+  background: #fffbfb !important;
+  padding: 20px !important;
 }
 
 .form-row {
@@ -393,10 +430,10 @@ const resetForm = () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   cursor: pointer;
-  font-size: 0.85rem;
-  color: #555;
+  font-size: 0.9rem;
+  color: #444;
 }
 
 .checkbox-label:last-child {
@@ -404,9 +441,10 @@ const resetForm = () => {
 }
 
 .checkbox-label input {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   accent-color: #9c27b0;
+  cursor: pointer;
 }
 
 .error-box {
@@ -421,16 +459,37 @@ const resetForm = () => {
 
 .success-box {
   text-align: center;
-  padding: 20px 0;
+  padding: 30px 10px;
+}
+
+.success-icon {
+  font-size: 3rem;
+  color: #2e7d32;
+  margin-bottom: 15px;
+}
+
+.success-box h4 {
+  font-size: 1.5rem;
+  color: #2e7d32;
+  margin: 0 0 12px 0;
 }
 
 .success-box p {
-  color: #2e7d32;
-  font-weight: 600;
-  margin-bottom: 20px;
+  color: #333;
+  font-size: 1rem;
+  margin-bottom: 12px;
 }
 
-/* Button & Nav styles */
+.success-box .callback-notice {
+  font-size: 0.95rem;
+  color: #555;
+  background: #edf7ed;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #c8e6c9;
+  margin: 20px 0;
+}
+
 .form-actions {
   display: flex;
   margin-top: 25px;
@@ -483,3 +542,4 @@ const resetForm = () => {
   cursor: not-allowed;
 }
 </style>
+
