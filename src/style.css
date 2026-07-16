@@ -1,0 +1,118 @@
+:root {
+    --primary: #6a1b9a;
+    --primary-light: #f3e5f5;
+    --primary-dark: #4a148c;
+    --accent: #9c27b0;
+    --text-dark: #2c2c2c;
+    --text-muted: #666666;
+    --bg-light: #f8f9fc;
+    --bg-card: #ffffff;
+    --shadow-soft: 0 10px 30px rgba(106, 27, 154, 0.05);
+    --shadow-hover: 0 15px 40px rgba(106, 27, 154, 0.12);
+    --radius-lg: 24px;
+    --radius-md: 16px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+body {
+    background: var(--bg-light);
+    color: var(--text-dark);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+.container {
+    width: min(1200px, 90%);
+    margin: auto;
+}
+
+section {
+    margin: 100px 0;
+}
+
+h1, h2, h3 {
+    color: var(--primary-dark);
+    font-weight: 800;
+}
+
+/* Global Button classes */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 28px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(106, 27, 154, 0.3);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(106, 27, 154, 0.4);
+}
+
+.btn-secondary {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+}
+
+.btn-secondary:hover {
+    background: #e1bee7;
+    transform: translateY(-2px);
+}
+
+/* Section Header Shared Component Utility */
+.section-header {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 50px auto;
+}
+
+.section-header h2 {
+    font-size: 2.2rem;
+    margin-bottom: 12px;
+}
+
+.section-header p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+/* Layout Grids */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 25px;
+}
+
+/* Card Styling */
+.card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 30px;
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-hover);
+}
+
