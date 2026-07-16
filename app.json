@@ -13,7 +13,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "sokohub",
     "userInterfaceStyle": "automatic",
-    "platforms": ["android"],
+    "platforms":["android", "web"],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
