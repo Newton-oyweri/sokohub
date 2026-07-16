@@ -105,17 +105,18 @@
             <label for="description">Short Bio / Description (Optional)</label>
             <textarea id="description" v-model="form.description" rows="2" placeholder="Tell customers about your shop..."></textarea>
           </div>
-<!-- Agreements -->
-<div class="agreement-box">
-  <label class="checkbox-label">
-    <input type="checkbox" v-model="form.agreedTerms" required />
-    <span>I agree to the <router-link to="/seller-terms" target="_blank">Seller Terms and  Conditions</router-link> *</span>
-  </label>
-  <label class="checkbox-label">
-    <input type="checkbox" v-model="form.agreedPrivacy" required />
-    <span>I agree to the <router-link to="/privacy-policy" target="_blank">Privacy Policy</router-link> *</span>
-  </label>
-</div>
+
+          <!-- Agreements -->
+          <div class="agreement-box">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="form.agreedTerms" required />
+              <span>I agree to the <router-link to="/seller-terms" target="_blank">Seller Terms and Conditions</router-link> *</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="form.agreedPrivacy" required />
+              <span>I agree to the <router-link to="/privacy-policy" target="_blank">Privacy Policy</router-link> *</span>
+            </label>
+          </div>
         </div>
 
         <!-- Navigation Actions -->
@@ -139,8 +140,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { supabase } from '../utils/supabaseClient'
+
+const STORAGE_KEY = 'sellerApplicationDraft'
 
 const isRegistering = ref(false)
 const currentStep = ref(1)
@@ -165,6 +168,42 @@ const form = reactive({
   agreedPrivacy: false
 })
 
+// --- Draft persistence (sessionStorage) ---
+// Restore any in-progress draft on mount, so a reload or the browser
+// tossing an inactive tab doesn't wipe what the user typed.
+onMounted(() => {
+  const saved = sessionStorage.getItem(STORAGE_KEY)
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      Object.assign(form, parsed.form)
+      currentStep.value = parsed.currentStep || 1
+      isRegistering.value = true // re-open the form if there's a draft
+    } catch (err) {
+      console.error('Failed to restore seller form draft:', err)
+      sessionStorage.removeItem(STORAGE_KEY)
+    }
+  }
+})
+
+// Save on every change to form fields or step
+watch(
+  [form, currentStep],
+  () => {
+    if (isRegistering.value && !submitSuccess.value) {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ form, currentStep: currentStep.value })
+      )
+    }
+  },
+  { deep: true }
+)
+
+const clearDraft = () => {
+  sessionStorage.removeItem(STORAGE_KEY)
+}
+
 const isFormValid = computed(() => {
   return form.agreedTerms && form.agreedPrivacy
 })
@@ -172,6 +211,7 @@ const isFormValid = computed(() => {
 const goBack = () => {
   if (currentStep.value === 1) {
     isRegistering.value = false // collapse back to original CTA style
+    clearDraft()
   } else {
     currentStep.value = 1
   }
@@ -203,6 +243,7 @@ const submitForm = async () => {
     if (error) throw error
 
     submitSuccess.value = true
+    clearDraft()
   } catch (err) {
     console.error('Error submitting seller request:', err.message)
     submitError.value = 'Something went wrong submitting your application. Please try again.'
@@ -231,8 +272,11 @@ const resetForm = () => {
   form.description = ''
   form.agreedTerms = false
   form.agreedPrivacy = false
+
+  clearDraft()
 }
 </script>
+
 
 <style scoped>
 .seller-cta {
