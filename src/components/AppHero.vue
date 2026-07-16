@@ -20,10 +20,10 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   <section class="hero">
     <div class="hero-wrapper">
       <div class="hero-content">
-        <h1>🎂 Celebrate in Style with <span>WonderBakes</span></h1>
+        <h1><span>WonderBakes</span> Celebrate in style</h1>
         <p>
-          From beautiful artisanal custom cakes and fresh hand-tied bouquets to curated party supplies. Order from the best local bakeries right to your door.
-        </p>
+  Discover fresh cakes, pastries, bread, cupcakes, cookies, pizzas, snacks, drinks, baking ingredients, cake decorations, and baking equipment from trusted local sellers—all delivered to your doorstep.
+</p>
         <div class="hero-actions">
           <a href="#download" class="btn btn-primary">Download Now</a>
           <a href="#features" class="btn btn-secondary">Learn More</a>
