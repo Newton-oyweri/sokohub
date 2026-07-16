@@ -4,28 +4,41 @@ import * as Notifications from 'expo-notifications';
 import { Router, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import { File, Paths } from 'expo-file-system'; // Added for offline cache lookup upon tap
 
-// Cache file targets matching your application schemas
-const productGridCache = new File(Paths.cache, 'product_grid_cache.json');
-const pinnedProductsCache = new File(Paths.cache, 'pinned_products_cache.json');
+// expo-file-system's File/Paths API is native-only — importing/instantiating
+// it on web throws at module-load time, which crashes the entire app before
+// React even mounts. Only create these on native platforms.
+let productGridCache: any = null;
+let pinnedProductsCache: any = null;
 
-// Configure foreground notifications behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+if (Platform.OS !== 'web') {
+  const { File, Paths } = require('expo-file-system');
+  productGridCache = new File(Paths.cache, 'product_grid_cache.json');
+  pinnedProductsCache = new File(Paths.cache, 'pinned_products_cache.json');
+}
+
+// Configure foreground notifications behavior — native only, this API
+// doesn't exist/work the same way on web.
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 export default function NotificationSetup() {
   const router = useRouter();
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
+    // Push notifications aren't supported on web in this setup — skip entirely.
+    if (Platform.OS === 'web') return;
+
     // Listen to changes in user authentication state
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
@@ -99,6 +112,11 @@ export default function NotificationSetup() {
 
 // Rewritten routing handler that deep-links directly into the order section if product data exists
 export async function routeFromNotificationData(router: Router, data: any) {
+  if (Platform.OS === 'web') {
+    router.push("/notifications");
+    return;
+  }
+
   if (!data) {
     router.push("/notifications");
     return;
@@ -112,14 +130,14 @@ export async function routeFromNotificationData(router: Router, data: any) {
       const targetName = data.productName; // Helpful fallback query parameter matching if sent via payload
 
       // 1. Search the Weekly Specials cache file
-      if (targetId && pinnedProductsCache.exists) {
+      if (targetId && pinnedProductsCache?.exists) {
         const content = await pinnedProductsCache.text();
         const list = JSON.parse(content || '[]');
         matchedProduct = list.find((p: any) => p.id === targetId || (targetName && p.name === targetName));
       }
 
       // 2. Search the Main Catalog item grid cache file
-      if (!matchedProduct && targetId && productGridCache.exists) {
+      if (!matchedProduct && targetId && productGridCache?.exists) {
         const content = await productGridCache.text();
         const list = JSON.parse(content || '[]');
         matchedProduct = list.find((p: any) => p.id === targetId || (targetName && p.name === targetName));
