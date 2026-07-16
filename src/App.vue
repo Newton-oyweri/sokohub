@@ -11,6 +11,7 @@
     <AppFinalCta />
   </div>
   <AppFooter />
+  <CookieConsent/>
 </template>
 
 <script setup>
@@ -24,5 +25,6 @@ import AppReviews from './components/AppReviews.vue'
 import AppFaq from './components/AppFaq.vue'
 import AppFinalCta from './components/AppFinalCta.vue'
 import AppFooter from './components/AppFooter.vue'
+import CookieConsent from './components/CookieConsent.vue'
 </script>
 
