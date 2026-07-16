@@ -30,19 +30,30 @@ const activeIndex = ref(null)
 
 const faqs = ref([
   {
-    question: "How do I track my order delivery in real-time?",
-    answer: "Once your seller accepts and packages your celebration order, your dynamic tracker will show you active rider details with continuous GPS coordinate markers inside the WonderBakes app."
+    question: "What is WonderBakes?",
+    answer: "WonderBakes is a marketplace where you can discover and order cakes, flowers, gifts, party supplies, and other celebration essentials from trusted local sellers."
   },
   {
-    question: "Can I order custom cake designs?",
-    answer: "Yes! You can connect with registered bakeries on the app, upload reference custom images, detail weight specifications, and request personalized flavor mixtures directly."
+    question: "How do I place an order?",
+    answer: "Browse products, choose your preferred item, add it to your cart, and complete checkout. Your order is then sent to the seller for confirmation and preparation."
   },
   {
-    question: "Which areas do you deliver to?",
-    answer: "We currently support delivery logistics across Nairobi, Mombasa, Kisumu, Nakuru, and their immediate metropolitan areas. Stay tuned as we scale locations!"
+    question: "Can I order a custom cake?",
+    answer: "Yes. Many bakeries accept custom cake orders. Simply provide your preferred design, flavor, size, message, and any reference images during checkout."
+  },
+ {
+  question: "How do deliveries work?",
+  answer: "Choose your preferred delivery option during checkout. You can select a convenient pickup location, or we'll deliver directly to your specified address. For homes and hostels, our delivery partner can call you upon arrival or leave your order at your door if you've requested contactless delivery."
+},
+  {
+    question: "Can I become a seller on WonderBakes?",
+    answer: "Yes. If you own a bakery, flower shop, or celebration business, you can register as a seller, upload your products, receive orders, and grow your business through the platform."
+  },
+  {
+    question: "What payment methods are supported?",
+    answer: "WonderBakes supports secure digital payments. Available payment options may vary depending on your region and will be shown during checkout."
   }
 ])
-
 const toggleFaq = (index) => {
   activeIndex.value = activeIndex.value === index ? null : index
 }
