@@ -105,18 +105,17 @@
             <label for="description">Short Bio / Description (Optional)</label>
             <textarea id="description" v-model="form.description" rows="2" placeholder="Tell customers about your shop..."></textarea>
           </div>
-
-          <!-- Agreements -->
-          <div class="agreement-box">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="form.agreedTerms" required />
-              <span>I agree to the <a href="#">Seller Terms & Conditions</a> *</span>
-            </label>
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="form.agreedPrivacy" required />
-              <span>I agree to the <a href="#">Privacy Policy</a> *</span>
-            </label>
-          </div>
+<!-- Agreements -->
+<div class="agreement-box">
+  <label class="checkbox-label">
+    <input type="checkbox" v-model="form.agreedTerms" required />
+    <span>I agree to the <router-link to="/seller-terms" target="_blank">Seller Terms and  Conditions</router-link> *</span>
+  </label>
+  <label class="checkbox-label">
+    <input type="checkbox" v-model="form.agreedPrivacy" required />
+    <span>I agree to the <router-link to="/privacy-policy" target="_blank">Privacy Policy</router-link> *</span>
+  </label>
+</div>
         </div>
 
         <!-- Navigation Actions -->
