@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Modal,
   RefreshControl,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { storage } from '@/lib/Storage';
+import { storage } from '@/lib/storage';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
 import NotLoggedInCard from './NotLoggedInCard';
@@ -24,6 +24,8 @@ export default function AccountContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [showLoginCard, setShowLoginCard] = useState(false);
   const [selectedTab, setSelectedTab] = useState('');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // Main UI States
   const [userName, setUserName] = useState<string>('New User');
@@ -37,7 +39,7 @@ export default function AccountContent() {
     try {
       await storage.setItem(CACHE_KEY, JSON.stringify(data));
     } catch (e) {
-      console.error('Failed to save cache:', e);
+      console.error(e);
     }
   };
 
@@ -53,13 +55,14 @@ export default function AccountContent() {
         setOrderCount(parsed.orderCount || 0);
       }
     } catch (e) {
-      console.error('Failed to load cache:', e);
+      console.error(e);
     }
   };
 
   // 2. Optimized Combined Background Data Fetch
   const fetchFreshData = useCallback(async (userId: string, email: string) => {
     try {
+      // Run all queries simultaneously in the background
       const [profileRes, walletRes, orderRes] = await Promise.all([
         supabase.from('profiles').select('full_name, avatar_url').eq('id', userId).single(),
         supabase.from('wallets').select('balance').eq('user_id', userId).single(),
@@ -91,7 +94,7 @@ export default function AccountContent() {
       setWalletBalance(freshBalance);
       setOrderCount(freshOrders);
 
-      // Silently update cache
+      // Silently update cache for the next app open
       await saveToCache({
         userName: freshName,
         userEmail: email,
@@ -105,19 +108,27 @@ export default function AccountContent() {
     }
   }, []);
 
-  const resetGuestState = useCallback(() => {
-    setUserName('Guest User');
-    setUserEmail('');
-    setAvatarUrl(null);
-    setWalletBalance(null);
-    setOrderCount(0);
-  }, []);
-
-  // 3. Auth Listener
+  // 3. Mount Logic & Auth Listener
   useEffect(() => {
     let mounted = true;
 
-    loadFromCache();
+    const initializeAuth = async () => {
+      // STEP A: Instantly load whatever we have cached first!
+      await loadFromCache();
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session && mounted) {
+        setIsLoggedIn(true);
+        // STEP B: Fetch fresh data silently in background
+        fetchFreshData(session.user.id, session.user.email || '');
+      } else if (mounted) {
+        setIsLoggedIn(false);
+        resetGuestState();
+      }
+    };
+
+    initializeAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -138,7 +149,15 @@ export default function AccountContent() {
       mounted = false;
       authListener?.subscription.unsubscribe();
     };
-  }, [fetchFreshData, resetGuestState]);
+  }, [fetchFreshData]);
+
+  const resetGuestState = () => {
+    setUserName('Guest User');
+    setUserEmail('');
+    setAvatarUrl(null);
+    setWalletBalance(null);
+    setOrderCount(0);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -149,6 +168,7 @@ export default function AccountContent() {
     setRefreshing(false);
   };
 
+  // Navigates to the real routes inside AccountTabs instead of swapping local state.
   const handleTabPress = (route: 'UserProfile' | 'Wallet' | 'MyOrders', tabName: string) => {
     if (!isLoggedIn) {
       setSelectedTab(tabName);
@@ -162,43 +182,52 @@ export default function AccountContent() {
   const handleWalletPress = () => handleTabPress('Wallet', 'Wallet');
   const handleOrdersPress = () => handleTabPress('MyOrders', 'Orders');
 
-  // Bulletproof Instant Logout
   const clearAllSession = async () => {
-    // 1. Reset UI locally instantly so it feels incredibly fast to the user
-    setIsLoggedIn(false);
-    resetGuestState();
+    setLoggingOut(true);
+    try {
+      // 1. Ask Supabase to sign out and invalidate the refresh token server-side.
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('signOut error:', e);
+    }
 
     try {
-      // 2. Clear cache keys
+      // 2. Clear our own app-level cache key.
       await storage.removeItem(CACHE_KEY);
-      
-      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    } catch (e) {
+      console.error('cache clear error:', e);
+    }
+
+    try {
+      // 3. Belt-and-braces: wipe any lingering Supabase auth keys directly from
+      // localStorage. supabase-js stores its session under a key like
+      // "sb-<project-ref>-auth-token" — if one is stale it can make the
+      // session appear to "come back" after reload.
+      if (typeof localStorage !== 'undefined') {
         Object.keys(localStorage)
           .filter((k) => k.startsWith('sb-'))
           .forEach((k) => localStorage.removeItem(k));
       }
     } catch (e) {
-      console.error('Local cache clear error:', e);
+      console.error('localStorage clear error:', e);
     }
 
-    try {
-      // 3. Sign out with local scope so we don't wait on server latency
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (e) {
-      console.error('Supabase signOut error:', e);
-    }
+    // 4. Reset in-memory UI state immediately.
+    setIsLoggedIn(false);
+    resetGuestState();
+    setShowLogoutModal(false);
+    setLoggingOut(false);
 
-    // 4. Safely redirect or refresh platform UI
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    // 5. Full reload guarantees the Supabase client re-initializes from a
+    // clean slate — no stale in-memory session can linger.
+    if (typeof window !== 'undefined') {
       window.location.reload();
-    } else {
-      router.replace('/');
     }
   };
 
   const handleAuthAction = () => {
     if (isLoggedIn) {
-      clearAllSession(); // Straight to logout!
+      setShowLogoutModal(true);
     } else {
       router.push('/auth');
     }
@@ -236,113 +265,116 @@ export default function AccountContent() {
             <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
           </TouchableOpacity>
 
-          {/* Profile Row */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={handleProfilePress}
-          >
-            <View style={styles.menuLeftContent}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={[styles.iconContainer, { backgroundColor: '#c4b5fd' }]}>
-                  <Ionicons name="person-outline" size={28} color="#6b46c1" />
+          {/* Renders instantly with Cached Data or placeholders. No more UI flashes! */}
+          <>
+            {/* Profile Row */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={handleProfilePress}
+            >
+              <View style={styles.menuLeftContent}>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <View style={[styles.iconContainer, { backgroundColor: '#c4b5fd' }]}>
+                    <Ionicons name="person-outline" size={28} color="#6b46c1" />
+                  </View>
+                )}
+
+                <View style={styles.textContainer}>
+                  <Text style={styles.menuTitle}>{userName}</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {isLoggedIn ? userEmail : 'Sign in to personalize your experience'}
+                  </Text>
                 </View>
-              )}
+              </View>
+              <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+            </TouchableOpacity>
 
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>{userName}</Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn ? userEmail : 'Sign in to personalize your experience'}
-                </Text>
+            {/* Wallet Row */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={handleWalletPress}
+            >
+              <View style={styles.menuLeftContent}>
+                <View style={[styles.iconContainer, { backgroundColor: '#a5f3fc' }]}>
+                  <Ionicons name="wallet-outline" size={28} color="#155e75" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.menuTitle}>My Wallet</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {isLoggedIn
+                      ? `KSh ${walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}`
+                      : 'Login to view wallet'}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+            </TouchableOpacity>
 
-          {/* Wallet Row */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={handleWalletPress}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#a5f3fc' }]}>
-                <Ionicons name="wallet-outline" size={28} color="#155e75" />
+            {/* My Orders Row */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={handleOrdersPress}
+            >
+              <View style={styles.menuLeftContent}>
+                <View style={[styles.iconContainer, { backgroundColor: '#fecaca' }]}>
+                  <Ionicons name="receipt-outline" size={28} color="#991b1b" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.menuTitle}>My Orders</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {isLoggedIn
+                      ? orderCount > 0
+                        ? `${orderCount} order${orderCount > 1 ? 's' : ''} placed`
+                        : 'No orders placed yet'
+                      : 'Login to view your orders'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>My Wallet</Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn
-                    ? `KSh ${walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}`
-                    : 'Login to view wallet'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+            </TouchableOpacity>
 
-          {/* My Orders Row */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={handleOrdersPress}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#fecaca' }]}>
-                <Ionicons name="receipt-outline" size={28} color="#991b1b" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>My Orders</Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn
-                    ? orderCount > 0
-                      ? `${orderCount} order${orderCount > 1 ? 's' : ''} placed`
-                      : 'No orders placed yet'
-                    : 'Login to view your orders'}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+            <View style={styles.spacer} />
 
-          <View style={styles.spacer} />
-
-          {/* Login / Logout Button Row */}
-          <TouchableOpacity
-            style={[
-              styles.menuItem,
-              isLoggedIn ? styles.logoutItem : styles.loginItem,
-            ]}
-            activeOpacity={0.7}
-            onPress={handleAuthAction}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[
-                styles.iconContainer,
-                isLoggedIn ? { backgroundColor: '#fee2e2' } : { backgroundColor: '#dbeafe' }
-              ]}>
-                <Ionicons
-                  name={isLoggedIn ? "log-out-outline" : "log-in-outline"}
-                  size={28}
-                  color={isLoggedIn ? "#dc2626" : "#2563eb"}
-                />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={[
-                  styles.menuTitle,
-                  isLoggedIn ? styles.logoutText : styles.loginText
+            {/* Login / Logout Button Row */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                isLoggedIn ? styles.logoutItem : styles.loginItem,
+              ]}
+              activeOpacity={0.7}
+              onPress={handleAuthAction}
+            >
+              <View style={styles.menuLeftContent}>
+                <View style={[
+                  styles.iconContainer,
+                  isLoggedIn ? { backgroundColor: '#fee2e2' } : { backgroundColor: '#dbeafe' }
                 ]}>
-                  {isLoggedIn ? 'Logout' : 'Login / Sign Up'}
-                </Text>
-                <Text style={styles.menuSubtitle}>
-                  {isLoggedIn ? 'Sign out of your account' : 'Access your orders and wallet'}
-                </Text>
+                  <Ionicons
+                    name={isLoggedIn ? "log-out-outline" : "log-in-outline"}
+                    size={28}
+                    color={isLoggedIn ? "#dc2626" : "#2563eb"}
+                  />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[
+                    styles.menuTitle,
+                    isLoggedIn ? styles.logoutText : styles.loginText
+                  ]}>
+                    {isLoggedIn ? 'Logout' : 'Login / Sign Up'}
+                  </Text>
+                  <Text style={styles.menuSubtitle}>
+                    {isLoggedIn ? 'Sign out of your account' : 'Access your orders and wallet'}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
+            </TouchableOpacity>
+          </>
 
           <View style={styles.bottomPadding} />
         </View>
@@ -355,6 +387,43 @@ export default function AccountContent() {
         dismissTimeout={3000}
         tabName={selectedTab}
       />
+
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="log-out-outline" size={30} color="#dc2626" />
+            </View>
+            <Text style={styles.logoutTitle}>Logout</Text>
+            <Text style={styles.logoutMessage}>Are you sure you want to logout?</Text>
+
+            <View style={styles.logoutButtonGroup}>
+              <TouchableOpacity
+                style={[styles.logoutButton, styles.logoutCancelButton]}
+                onPress={() => setShowLogoutModal(false)}
+                disabled={loggingOut}
+              >
+                <Text style={styles.logoutCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.logoutButton, styles.logoutConfirmButton]}
+                onPress={clearAllSession}
+                disabled={loggingOut}
+              >
+                <Text style={styles.logoutConfirmText}>
+                  {loggingOut ? 'Logging out...' : 'Logout'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -363,6 +432,12 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1, backgroundColor: '#f9fafb' },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
   menuContainer: { padding: 16, paddingTop: 20 },
+  inlineLoadingContainer: {
+    paddingVertical: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: { fontSize: 16, color: '#6b7280' },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -417,4 +492,68 @@ const styles = StyleSheet.create({
   loginText: { color: '#2563eb' },
   spacer: { flex: 1, minHeight: 30 },
   bottomPadding: { height: 80 },
+  logoutOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  logoutCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  logoutIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  logoutTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  logoutMessage: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 22,
+  },
+  logoutButtonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  logoutButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutCancelButton: {
+    backgroundColor: '#f3f4f6',
+  },
+  logoutCancelText: {
+    color: '#4b5563',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  logoutConfirmButton: {
+    backgroundColor: '#dc2626',
+  },
+  logoutConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });
