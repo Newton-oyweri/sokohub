@@ -9,7 +9,7 @@ import {
   Platform,
   StatusBar,
   Image,
-  useWindowDimensions,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CakeCarousel from './Cakes/CakeCarousel';
@@ -19,17 +19,9 @@ import { supabase } from '../../lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
-// Above this viewport width, we switch to the branded split layout:
-// app content capped at phone width on the left, branding panel on the right.
-const WIDE_LAYOUT_BREAKPOINT = 900;
-const APP_COLUMN_WIDTH = 480;
-
 // This is now the ONLY route for this screen. Do not create a second
 // route file for Account — it is a tab of this shell, not a destination.
 export default function App() {
-  const { width } = useWindowDimensions();
-  const isWideLayout = width >= WIDE_LAYOUT_BREAKPOINT;
-
   // Supports deep-linking straight to a tab, e.g. router.push("/(tabs)?tab=account")
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'cakes' | 'account'>(
@@ -57,6 +49,24 @@ export default function App() {
   const handleShopPress = () => {
     setActiveTab('cakes');
   };
+
+  // --- SMART HARDWARE BACK BUTTON ---
+  // On Account tab: back returns to Shop instead of leaving the screen/app.
+  // On Shop tab: back falls through to default behavior (exit app / pop stack).
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (activeTab === 'account') {
+          setActiveTab('cakes');
+          return true; // handled — block default back behavior
+        }
+        return false; // let the OS/navigator do its default thing
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [activeTab])
+  );
 
   // --- CORE AUTH LIFECYCLE ---
   useEffect(() => {
@@ -208,10 +218,9 @@ export default function App() {
     extrapolate: 'clamp',
   });
 
-  // The actual app UI — unchanged from the phone layout, just rendered inside
-  // whichever wrapper the breakpoint below picks.
-  const appContent = (
+  return (
     <View style={styles.container}>
+
       {/* Background Header */}
       <View style={[styles.headerBackground, { paddingTop: STATUS_BAR_HEIGHT }]}>
         <Header />
@@ -314,24 +323,6 @@ export default function App() {
 
         {unreadCount > 0 && <View style={styles.badgeIndicator} />}
       </TouchableOpacity>
-    </View>
-  );
-
-  // Narrow viewport (or actual mobile browser): behave exactly like before.
-  if (!isWideLayout) {
-    return appContent;
-  }
-
-  // Wide viewport: app content capped at phone width on the left,
-  // branding panel filling the remaining space on the right.
-  return (
-    <View style={styles.wideRoot}>
-      <View style={styles.wideAppColumn}>
-        {appContent}
-      </View>
-      <View style={styles.brandingPanel}>
-        <Text style={styles.brandingText}>Wonderbakes</Text>
-      </View>
     </View>
   );
 }
@@ -452,34 +443,5 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
-  },
-
-  // --- Wide layout (desktop web) styles ---
-  wideRoot: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#6b46c1',
-  },
-  wideAppColumn: {
-    width: APP_COLUMN_WIDTH,
-    height: '100%',
-    // Subtle shadow so the app column reads as a distinct "device" against
-    // the branding panel, without any extra design work.
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-  },
-  brandingPanel: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#6b46c1',
-  },
-  brandingText: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -1,
   },
 });
