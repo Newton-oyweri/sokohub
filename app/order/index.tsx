@@ -3,8 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -27,6 +27,42 @@ const DEFAULT_PRODUCT = {
 };
 
 const KIBABII_ADDRESS = 'Bungoma, Kibabii opposite main gate';
+
+interface InfoModalState {
+  title: string;
+  message: string;
+}
+
+function InfoModal({
+  info,
+  onClose,
+}: {
+  info: InfoModalState | null;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={!!info}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalIconWrap}>
+            <Ionicons name="alert-circle" size={28} color="#6b46c1" />
+          </View>
+          <Text style={styles.modalTitle}>{info?.title}</Text>
+          <Text style={styles.modalMessage}>{info?.message}</Text>
+
+          <TouchableOpacity style={styles.modalButton} onPress={onClose} activeOpacity={0.8}>
+            <Text style={styles.modalButtonText}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
@@ -73,6 +109,8 @@ export default function OrderScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
 
+  const [infoModal, setInfoModal] = useState<InfoModalState | null>(null);
+
   const customerId = typeof params.customerId === 'string'
     ? params.customerId
     : typeof params.customer_id === 'string'
@@ -114,10 +152,20 @@ export default function OrderScreen() {
 
   const triggerCheckoutModal = () => {
     if (fulfillmentMethod === 'door_delivery' && !deliveryAddress.trim()) {
-      Alert.alert('Address Required', 'Please provide an address for door delivery or select self-pickup.');
+      setInfoModal({
+        title: 'Address Required',
+        message: 'Please provide an address for door delivery or select self-pickup.',
+      });
       return;
     }
     setIsModalVisible(true);
+  };
+
+  const handleAuthRequired = () => {
+    setInfoModal({
+      title: 'Authentication Required',
+      message: 'Please sign in to continue.',
+    });
   };
 
   return (
@@ -267,7 +315,7 @@ export default function OrderScreen() {
       <ConfirmOrder
         isVisible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
-        onAuthRequired={() => Alert.alert('Authentication required', 'Please sign in to continue.')}
+        onAuthRequired={handleAuthRequired}
         product={{
           id: product.id,
           name: product.name,
@@ -286,6 +334,8 @@ export default function OrderScreen() {
         customerId={customerId}
         sellerId={sellerId || product.seller_id || ''}
       />
+
+      <InfoModal info={infoModal} onClose={() => setInfoModal(null)} />
     </KeyboardAvoidingView>
   );
 }
@@ -329,4 +379,40 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   checkoutButton: { backgroundColor: '#6b46c1', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
   checkoutButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#faf5ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 8, textAlign: 'center' },
+  modalMessage: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  modalButton: {
+    backgroundColor: '#6b46c1',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

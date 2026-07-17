@@ -26,7 +26,6 @@ export default function DownloadAction() {
     if (!visible) return;
 
     const interval = setInterval(() => {
-      // slide current out to the left, then swap content and slide in from the right
       Animated.timing(translateX, {
         toValue: -24,
         duration: 220,
@@ -54,6 +53,11 @@ export default function DownloadAction() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.downloadBox}>
+        <Ionicons name="download-outline" size={18} color="#fff" />
+        <Text style={styles.downloadBoxText}>Download Now</Text>
+      </View>
+
       <View style={styles.contentRow}>
         <View style={styles.iconBadge}>
           {slide.iconSet === 'ion' ? (
@@ -75,7 +79,7 @@ export default function DownloadAction() {
         style={styles.closeButton}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Ionicons name="close" size={16} color="#94a3b8" />
+        <Ionicons name="close" size={26} color="#94a3b8" />
       </TouchableOpacity>
     </View>
   );
@@ -87,8 +91,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 16,
 
-    paddingVertical: 30,
+    paddingVertical: 10,
     paddingHorizontal: 40,
 
     backgroundColor: '#faf5ff',
@@ -96,11 +101,36 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
   },
 
+  downloadBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+
+    backgroundColor: '#6b46c1',
+
+    shadowColor: '#6b46c1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  downloadBoxText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     overflow: 'hidden',
+    flex: 1,
   },
 
   iconBadge: {
@@ -119,7 +149,6 @@ const styles = StyleSheet.create({
   },
 
   closeButton: {
-    position: 'absolute',
-    right: 12,
+    marginLeft: 4,
   },
 });
