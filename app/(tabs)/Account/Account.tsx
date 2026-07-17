@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { storage } from '@/lib/storage';
+import { storage } from '@/lib/Storage';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
 import NotLoggedInCard from './NotLoggedInCard';
