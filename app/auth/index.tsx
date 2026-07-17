@@ -1,8 +1,6 @@
-import { sendNotification } from "@/lib/notifications";
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,17 +15,6 @@ import {
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
-// Configure notification handler once
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
 export default function AuthScreen() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
@@ -37,49 +24,9 @@ export default function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    registerForPushNotifications();
-  }, []);
-
-  const registerForPushNotifications = async () => {
-    try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        if (status !== 'granted') return;
-      }
-      
-      await Notifications.getExpoPushTokenAsync({
-        projectId: '41c96e3f-d6b2-49fd-bccc-323ce431dcfb',
-      });
-
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
-      }
-    } catch {
-      // Silent fail for push notifications
-    }
-  };
-
-  const sendAuthSuccessNotification = async (isNewUser: boolean) => {
-    try {
-      await sendNotification({
-        title: isNewUser ? "Welcome to Wonderbakes!" : "Welcome Back!",
-        body: isNewUser
-          ? "Your account is ready. Let's find your perfect dessert!"
-          : "You've successfully logged in. Enjoy browsing your favorites!",
-        data: { type: "auth_success" },
-      });
-    } catch {
-      // Silent fail for notifications
-    }
-  };
+  // Track which field is focused so we can swap the border color instead of
+  // showing the browser's default black/blue outline on web.
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const validateFields = (): string | null => {
     if (!email || !password) return 'Please fill in all fields';
@@ -114,9 +61,8 @@ export default function AuthScreen() {
       }
 
       if (result.error) throw result.error;
-      
+
       if (result.data.user) {
-        await sendAuthSuccessNotification(!isLogin);
         router.back();
       }
     } catch (error: any) {
@@ -159,6 +105,13 @@ export default function AuthScreen() {
     setShowPassword(false);
   };
 
+  // Helper to combine the base input style with a focus-state border color,
+  // and strip the browser's default focus outline (web only).
+  const inputContainerStyle = (fieldName: string) => [
+    styles.inputContainer,
+    focusedField === fieldName && styles.inputContainerFocused,
+  ];
+
   return (
     <View style={styles.rootWrapper}>
       <KeyboardAvoidingView
@@ -180,7 +133,7 @@ export default function AuthScreen() {
           </View>
 
           <View style={styles.formContainer}>
-            <View style={styles.inputContainer}>
+            <View style={inputContainerStyle('email')}>
               <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -188,13 +141,15 @@ export default function AuthScreen() {
                 placeholderTextColor="#9ca3af"
                 value={email}
                 onChangeText={setEmail}
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!loading}
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            <View style={inputContainerStyle('password')}>
               <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -202,6 +157,8 @@ export default function AuthScreen() {
                 placeholderTextColor="#9ca3af"
                 value={password}
                 onChangeText={setPassword}
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
@@ -218,7 +175,7 @@ export default function AuthScreen() {
             </View>
 
             {!isLogin && (
-              <View style={styles.inputContainer}>
+              <View style={inputContainerStyle('confirmPassword')}>
                 <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
@@ -226,6 +183,8 @@ export default function AuthScreen() {
                   placeholderTextColor="#9ca3af"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
+                  onFocus={() => setFocusedField('confirmPassword')}
+                  onBlur={() => setFocusedField(null)}
                   secureTextEntry={!showPassword}
                   editable={!loading}
                 />
@@ -324,6 +283,10 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     height: 56,
   },
+  inputContainerFocused: {
+    borderColor: '#6b46c1',
+    borderWidth: 1.5,
+  },
   inputIcon: {
     marginRight: 12,
   },
@@ -332,6 +295,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
     height: '100%',
+    // @ts-ignore - outlineStyle is a react-native-web-only style prop that
+    // removes the browser's default black/blue focus ring on <input>.
+    outlineStyle: 'none',
   },
   eyeIcon: {
     padding: 8,
