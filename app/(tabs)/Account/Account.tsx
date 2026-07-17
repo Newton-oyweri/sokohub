@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Modal,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,8 @@ export default function AccountContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [showLoginCard, setShowLoginCard] = useState(false);
   const [selectedTab, setSelectedTab] = useState('');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // Main UI States
   const [userName, setUserName] = useState<string>('New User');
@@ -179,18 +182,52 @@ export default function AccountContent() {
   const handleWalletPress = () => handleTabPress('Wallet', 'Wallet');
   const handleOrdersPress = () => handleTabPress('MyOrders', 'Orders');
 
-  const handleAuthAction = async () => {
-    if (isLoggedIn) {
-      const confirmed = typeof window !== 'undefined'
-        ? window.confirm('Logout\n\nAre you sure you want to logout?')
-        : false;
+  const clearAllSession = async () => {
+    setLoggingOut(true);
+    try {
+      // 1. Ask Supabase to sign out and invalidate the refresh token server-side.
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('signOut error:', e);
+    }
 
-      if (!confirmed) return;
+    try {
+      // 2. Clear our own app-level cache key.
+      await storage.removeItem(CACHE_KEY);
+    } catch (e) {
+      console.error('cache clear error:', e);
+    }
 
-      const { error } = await supabase.auth.signOut();
-      if (error && typeof window !== 'undefined') {
-        window.alert(error.message);
+    try {
+      // 3. Belt-and-braces: wipe any lingering Supabase auth keys directly from
+      // localStorage. supabase-js stores its session under a key like
+      // "sb-<project-ref>-auth-token" — if one is stale it can make the
+      // session appear to "come back" after reload.
+      if (typeof localStorage !== 'undefined') {
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith('sb-'))
+          .forEach((k) => localStorage.removeItem(k));
       }
+    } catch (e) {
+      console.error('localStorage clear error:', e);
+    }
+
+    // 4. Reset in-memory UI state immediately.
+    setIsLoggedIn(false);
+    resetGuestState();
+    setShowLogoutModal(false);
+    setLoggingOut(false);
+
+    // 5. Full reload guarantees the Supabase client re-initializes from a
+    // clean slate — no stale in-memory session can linger.
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
+
+  const handleAuthAction = () => {
+    if (isLoggedIn) {
+      setShowLogoutModal(true);
     } else {
       router.push('/auth');
     }
@@ -350,6 +387,43 @@ export default function AccountContent() {
         dismissTimeout={3000}
         tabName={selectedTab}
       />
+
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.logoutOverlay}>
+          <View style={styles.logoutCard}>
+            <View style={styles.logoutIconCircle}>
+              <Ionicons name="log-out-outline" size={30} color="#dc2626" />
+            </View>
+            <Text style={styles.logoutTitle}>Logout</Text>
+            <Text style={styles.logoutMessage}>Are you sure you want to logout?</Text>
+
+            <View style={styles.logoutButtonGroup}>
+              <TouchableOpacity
+                style={[styles.logoutButton, styles.logoutCancelButton]}
+                onPress={() => setShowLogoutModal(false)}
+                disabled={loggingOut}
+              >
+                <Text style={styles.logoutCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.logoutButton, styles.logoutConfirmButton]}
+                onPress={clearAllSession}
+                disabled={loggingOut}
+              >
+                <Text style={styles.logoutConfirmText}>
+                  {loggingOut ? 'Logging out...' : 'Logout'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -418,4 +492,68 @@ const styles = StyleSheet.create({
   loginText: { color: '#2563eb' },
   spacer: { flex: 1, minHeight: 30 },
   bottomPadding: { height: 80 },
+  logoutOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  logoutCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  logoutIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  logoutTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  logoutMessage: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 22,
+  },
+  logoutButtonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  logoutButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutCancelButton: {
+    backgroundColor: '#f3f4f6',
+  },
+  logoutCancelText: {
+    color: '#4b5563',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  logoutConfirmButton: {
+    backgroundColor: '#dc2626',
+  },
+  logoutConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });
