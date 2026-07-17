@@ -5,12 +5,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Platform,
   ScrollView,
   Image,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store'; // Built-in Expo storage!
+import { storage } from '@/lib/Storage';
+import { confirmDialog } from '@/lib/confirmDialog';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
 import NotLoggedInCard from './NotLoggedInCard';
@@ -35,7 +37,7 @@ export default function AccountContent() {
   // 1. Local Cache Functions
   const saveToCache = async (data: any) => {
     try {
-      await SecureStore.setItemAsync(CACHE_KEY, JSON.stringify(data));
+      await storage.setItem(CACHE_KEY, JSON.stringify(data));
     } catch (e) {
       console.error(e);
     }
@@ -43,7 +45,7 @@ export default function AccountContent() {
 
   const loadFromCache = async () => {
     try {
-      const cached = await SecureStore.getItemAsync(CACHE_KEY);
+      const cached = await storage.getItem(CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
         setUserName(parsed.userName || 'Wonderland Customer');
@@ -138,7 +140,7 @@ export default function AccountContent() {
         } else {
           setIsLoggedIn(false);
           resetGuestState();
-          await SecureStore.deleteItemAsync(CACHE_KEY);
+          await storage.removeItem(CACHE_KEY);
         }
       }
     );
@@ -182,17 +184,24 @@ export default function AccountContent() {
 
   const handleAuthAction = async () => {
     if (isLoggedIn) {
-      Alert.alert('Logout', 'Are you sure you want to logout?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.auth.signOut();
-            if (error) Alert.alert('Error', error.message);
-          },
-        },
-      ]);
+      const confirmed = await confirmDialog({
+        title: 'Logout',
+        message: 'Are you sure you want to logout?',
+        confirmText: 'Logout',
+        cancelText: 'Cancel',
+        destructive: true,
+      });
+
+      if (!confirmed) return;
+
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.alert(error.message);
+        } else {
+          Alert.alert('Error', error.message);
+        }
+      }
     } else {
       router.push('/auth');
     }
@@ -356,7 +365,6 @@ export default function AccountContent() {
   );
 }
 
-// ... styles object remains unchanged ...
 const styles = StyleSheet.create({
   scrollView: { flex: 1, backgroundColor: '#f9fafb' },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
