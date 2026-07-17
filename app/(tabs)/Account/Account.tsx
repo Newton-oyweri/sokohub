@@ -4,15 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
-  Platform,
   ScrollView,
   Image,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { storage } from '@/lib/Storage';
-import { confirmDialog } from '@/lib/confirmDialog';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'expo-router';
 import NotLoggedInCard from './NotLoggedInCard';
@@ -184,23 +181,15 @@ export default function AccountContent() {
 
   const handleAuthAction = async () => {
     if (isLoggedIn) {
-      const confirmed = await confirmDialog({
-        title: 'Logout',
-        message: 'Are you sure you want to logout?',
-        confirmText: 'Logout',
-        cancelText: 'Cancel',
-        destructive: true,
-      });
+      const confirmed = typeof window !== 'undefined'
+        ? window.confirm('Logout\n\nAre you sure you want to logout?')
+        : false;
 
       if (!confirmed) return;
 
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.alert(error.message);
-        } else {
-          Alert.alert('Error', error.message);
-        }
+      if (error && typeof window !== 'undefined') {
+        window.alert(error.message);
       }
     } else {
       router.push('/auth');
