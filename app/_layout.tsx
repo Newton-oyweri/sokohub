@@ -9,30 +9,31 @@ import {
   TextInput, 
   TouchableOpacity, 
   StyleSheet, 
-  ActivityIndicator 
+  ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
-import 'react-native-gesture-handler';
-import 'react-native-reanimated';
 import { Stack, useRouter } from 'expo-router';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '../lib/supabase';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import NotificationSetup from '@/components/NotificationSetup';
-import { configureNotifications } from "@/lib/notifications";
 
+// Above this viewport width, the app renders as a centered phone-width
+// column with a plain branded background filling the rest of the screen —
+// same idea as WhatsApp Web / Instagram on desktop.
+const WIDE_LAYOUT_BREAKPOINT = 900;
+const APP_COLUMN_WIDTH = 480;
 
 export default function RootLayout() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= WIDE_LAYOUT_BREAKPOINT;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [updating, setUpdating] = useState(false);
-  
+
   useEffect(() => {
-    configureNotifications();
-    
-    // Added on top: Explicitly wakes up the Supabase auth client instance on cold boot 
-    // to guarantee it finishes extracting the persisted session from local storage.
+    // Explicitly wakes up the Supabase auth client instance on cold boot
+    // to guarantee it finishes extracting the persisted session from storage.
     supabase.auth.getSession();
   }, []);
 
@@ -44,7 +45,7 @@ export default function RootLayout() {
 
     const handleUrl = async (url: string) => {
       if (url.includes('/auth/v1/verify') || url.includes('type=recovery') || url.includes('error=')) {
-        
+
         if (url.includes('error=')) {
           const hashPart = url.split('#')[1];
           if (hashPart) {
@@ -58,7 +59,7 @@ export default function RootLayout() {
             }
           }
         }
-        
+
         let accessToken = null;
         let refreshToken = null;
 
@@ -122,13 +123,13 @@ export default function RootLayout() {
       if (error) throw error;
 
       Alert.alert('Success', 'Your password has been changed successfully!', [
-        { 
-          text: 'OK', 
+        {
+          text: 'OK',
           onPress: () => {
             setModalVisible(false);
             setNewPassword('');
             router.replace('/(tabs)');
-          } 
+          }
         }
       ]);
     } catch (err: any) {
@@ -138,14 +139,14 @@ export default function RootLayout() {
     }
   };
 
-  return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
-          <NotificationSetup />
-        
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="auth" />
+  // The actual app — the Stack, the password-reset modal, everything.
+  // This is what gets capped to phone width on wide screens.
+  const appContent = (
+    <>
+      <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
+
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="auth" />
         <Stack.Screen name="(tabs)" />
       </Stack>
 
@@ -159,7 +160,7 @@ export default function RootLayout() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Reset Password</Text>
             <Text style={styles.modalSubtitle}>Please enter your new password below:</Text>
-            
+
             <TextInput
               style={styles.input}
               placeholder="Minimum 6 characters"
@@ -171,8 +172,8 @@ export default function RootLayout() {
             />
 
             <View style={styles.buttonGroup}>
-              <TouchableOpacity 
-                style={[styles.button, styles.cancelButton]} 
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
                 onPress={() => {
                   setModalVisible(false);
                   router.replace('/auth');
@@ -182,8 +183,8 @@ export default function RootLayout() {
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.button, styles.submitButton]} 
+              <TouchableOpacity
+                style={[styles.button, styles.submitButton]}
                 onPress={handlePasswordSubmit}
                 disabled={updating}
               >
@@ -197,8 +198,25 @@ export default function RootLayout() {
           </View>
         </View>
       </Modal>
-    </GestureHandlerRootView>
-       </SafeAreaProvider>
+    </>
+  );
+
+  return (
+    <SafeAreaProvider>
+      {isWideLayout ? (
+        <View style={styles.wideRoot}>
+          <View style={styles.brandingPanel} />
+          <View style={styles.wideAppColumn}>
+            {appContent}
+          </View>
+          <View style={styles.brandingPanel} />
+        </View>
+      ) : (
+        <View style={{ flex: 1 }}>
+          {appContent}
+        </View>
+      )}
+    </SafeAreaProvider>
   );
 }
 
@@ -273,5 +291,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 15,
+  },
+
+  // --- Wide layout (desktop web) styles ---
+  wideRoot: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#ede9fe',
+  },
+  wideAppColumn: {
+    width: APP_COLUMN_WIDTH,
+    height: '100%',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+  },
+  brandingPanel: {
+    flex: 1,
+    backgroundColor: '#ede9fe',
   },
 });
