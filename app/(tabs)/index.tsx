@@ -220,8 +220,10 @@ export default function App() {
   });
 
   return (
-    <View style={styles.container}>
+    <> 
       <DownloadAction/>
+    <View style={styles.container}>
+      
 
       {/* Background Header */}
       <View style={[styles.headerBackground, { paddingTop: STATUS_BAR_HEIGHT }]}>
@@ -326,6 +328,7 @@ export default function App() {
         {unreadCount > 0 && <View style={styles.badgeIndicator} />}
       </TouchableOpacity>
     </View>
+    </>
   );
 }
 
