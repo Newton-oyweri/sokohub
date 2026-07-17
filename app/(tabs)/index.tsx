@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import CakeCarousel from './Cakes/CakeCarousel';
 import Account from './Account/Account';
 import Header, { HEADER_HEIGHT } from '../../components/Header';
+import DownloadAction from '../../components/DownloadAction';
 import { supabase } from '../../lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
@@ -220,6 +221,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
+      <DownloadAction/>
 
       {/* Background Header */}
       <View style={[styles.headerBackground, { paddingTop: STATUS_BAR_HEIGHT }]}>
