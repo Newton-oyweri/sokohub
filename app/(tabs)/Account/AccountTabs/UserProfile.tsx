@@ -20,6 +20,8 @@ const AVATARS = [
   { id: 'female', url: 'https://ntfltripxmqpwncfsbzt.supabase.co/storage/v1/object/public/profile_avatar/femaleavatar.png' }
 ];
 
+const GENDER_OPTIONS = ['male', 'female', 'other'];
+
 export default function UserProfile() {
   const insets = useSafeAreaInsets();
   const [isEditing, setIsEditing] = useState(false);
@@ -30,6 +32,10 @@ export default function UserProfile() {
   const [phone, setPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(AVATARS[0].url);
   const [isChoosingAvatar, setIsChoosingAvatar] = useState(false);
+
+  // New Profile States
+  const [birthday, setBirthday] = useState(''); // Holds formatted text 'YYYY-MM-DD'
+  const [gender, setGender] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
@@ -48,7 +54,7 @@ export default function UserProfile() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, phone, avatar_url')
+        .select('full_name, phone, avatar_url, birthday, gender')
         .eq('id', user.id)
         .single();
 
@@ -56,6 +62,8 @@ export default function UserProfile() {
         setName(data.full_name || '');
         setPhone(data.phone || '');
         setAvatarUrl(data.avatar_url || AVATARS[0].url);
+        setBirthday(data.birthday || '');
+        setGender(data.gender || null);
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to fetch profile.');
@@ -66,8 +74,17 @@ export default function UserProfile() {
 
   const handleSave = async () => {
     if (!userId || !name.trim() || !phone.trim()) {
-      Alert.alert('Validation Error', 'All fields are required.');
+      Alert.alert('Validation Error', 'Full Name and Phone Number are required.');
       return;
+    }
+
+    // Basic date structure check if the user typed something into birthday
+    if (birthday.trim().length > 0) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(birthday.trim())) {
+        Alert.alert('Validation Error', 'Please enter a birthday using the YYYY-MM-DD format.');
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -79,6 +96,8 @@ export default function UserProfile() {
           full_name: name.trim(),
           phone: phone.trim(),
           avatar_url: avatarUrl,
+          birthday: birthday.trim() || null,
+          gender: gender || null,
           updated_at: new Date().toISOString()
         });
 
@@ -118,7 +137,7 @@ export default function UserProfile() {
       </View>
 
       {/* Scrollable Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
@@ -130,14 +149,14 @@ export default function UserProfile() {
               <Text style={styles.selectorTitle}>Choose Avatar</Text>
               <View style={styles.avatarGrid}>
                 {AVATARS.map((avatar) => (
-                  <TouchableOpacity 
-                    key={avatar.id} 
+                  <TouchableOpacity
+                    key={avatar.id}
                     onPress={() => {
                       setAvatarUrl(avatar.url);
                       setIsChoosingAvatar(false);
                     }}
                     style={[
-                      styles.gridAvatarWrapper, 
+                      styles.gridAvatarWrapper,
                       avatarUrl === avatar.url && styles.selectedGridAvatar
                     ]}
                   >
@@ -147,8 +166,8 @@ export default function UserProfile() {
               </View>
             </View>
           ) : (
-            <TouchableOpacity 
-              style={styles.avatarContainer} 
+            <TouchableOpacity
+              style={styles.avatarContainer}
               onPress={() => isEditing && setIsChoosingAvatar(true)}
               disabled={!isEditing}
             >
@@ -160,7 +179,7 @@ export default function UserProfile() {
               )}
             </TouchableOpacity>
           )}
-          
+
           {!isChoosingAvatar && (
             <>
               <Text style={styles.userName}>{name.trim() || 'New User'}</Text>
@@ -174,7 +193,8 @@ export default function UserProfile() {
         {/* Profile Form */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Personal Information</Text>
-          
+
+          {/* Full Name */}
           <View style={styles.field}>
             <Text style={styles.label}>Full Name</Text>
             {isEditing ? (
@@ -191,7 +211,8 @@ export default function UserProfile() {
             )}
           </View>
 
-          <View style={[styles.field, styles.lastField]}>
+          {/* Phone Number */}
+          <View style={styles.field}>
             <Text style={styles.label}>Phone Number</Text>
             {isEditing ? (
               <TextInput
@@ -207,20 +228,71 @@ export default function UserProfile() {
               <Text style={styles.value}>{phone || 'Not set'}</Text>
             )}
           </View>
+
+          {/* Birthday Field */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Birthday</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.input}
+                value={birthday}
+                onChangeText={setBirthday}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#94a3b8"
+                maxLength={10}
+                editable={!isSaving}
+              />
+            ) : (
+              <Text style={styles.value}>{birthday || 'Not set'}</Text>
+            )}
+          </View>
+
+          {/* Gender Field */}
+          <View style={[styles.field, styles.lastField]}>
+            <Text style={styles.label}>Gender</Text>
+            {isEditing ? (
+              <View style={styles.genderContainer}>
+                {GENDER_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.genderTab,
+                      gender === option && styles.genderTabSelected
+                    ]}
+                    onPress={() => setGender(option)}
+                    disabled={isSaving}
+                  >
+                    <Text
+                      style={[
+                        styles.genderTabText,
+                        gender === option && styles.genderTabTextSelected
+                      ]}
+                    >
+                      {option.charAt(0).toUpperCase() + option.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.value}>
+                {gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : 'Not set'}
+              </Text>
+            )}
+          </View>
         </View>
 
         {/* Actions */}
         {isEditing ? (
           <View style={styles.actionRow}>
-            <TouchableOpacity 
-              style={[styles.btn, styles.cancelBtn]} 
+            <TouchableOpacity
+              style={[styles.btn, styles.cancelBtn]}
               onPress={handleCancel}
               disabled={isSaving}
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.btn, styles.saveBtn]} 
+            <TouchableOpacity
+              style={[styles.btn, styles.saveBtn]}
               onPress={handleSave}
               disabled={isSaving}
             >
@@ -232,8 +304,8 @@ export default function UserProfile() {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity 
-            style={styles.editBtn} 
+          <TouchableOpacity
+            style={styles.editBtn}
             onPress={() => setIsEditing(true)}
           >
             <Text style={styles.editBtnText}>Edit Profile</Text>
@@ -409,6 +481,32 @@ const styles = StyleSheet.create({
     borderColor: '#ede9fe',
     marginTop: 2,
   },
+  genderContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+    marginTop: 4,
+  },
+  genderTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  genderTabSelected: {
+    backgroundColor: '#6b46c1',
+  },
+  genderTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  genderTabTextSelected: {
+    color: '#fff',
+  },
   editBtn: {
     backgroundColor: '#6b46c1',
     paddingVertical: 16,
@@ -450,3 +548,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

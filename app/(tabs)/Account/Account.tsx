@@ -33,10 +33,6 @@ export default function AccountContent() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [orderCount, setOrderCount] = useState<number>(0);
-  
-  // New Personal Profile States
-  const [birthday, setBirthday] = useState<string | null>(null);
-  const [gender, setGender] = useState<string | null>(null);
 
   // 1. Local Cache Functions
   const saveToCache = async (data: any) => {
@@ -57,8 +53,6 @@ export default function AccountContent() {
         setAvatarUrl(parsed.avatarUrl || null);
         setWalletBalance(parsed.walletBalance ?? null);
         setOrderCount(parsed.orderCount || 0);
-        setBirthday(parsed.birthday || null);
-        setGender(parsed.gender || null);
       }
     } catch (e) {
       console.error(e);
@@ -68,9 +62,9 @@ export default function AccountContent() {
   // 2. Optimized Combined Background Data Fetch
   const fetchFreshData = useCallback(async (userId: string, email: string) => {
     try {
-      // Run all queries simultaneously in the background (including birthday & gender now)
+      // Run all queries simultaneously in the background
       const [profileRes, walletRes, orderRes] = await Promise.all([
-        supabase.from('profiles').select('full_name, avatar_url, birthday, gender').eq('id', userId).single(),
+        supabase.from('profiles').select('full_name, avatar_url').eq('id', userId).single(),
         supabase.from('wallets').select('balance').eq('user_id', userId).single(),
         supabase.from('orders').select('id', { count: 'exact', head: true }).eq('customer_id', userId)
       ]);
@@ -79,14 +73,10 @@ export default function AccountContent() {
       let freshAvatar = null;
       let freshBalance = null;
       let freshOrders = 0;
-      let freshBirthday = null;
-      let freshGender = null;
 
       if (profileRes.data) {
         freshName = profileRes.data.full_name?.trim() || 'Wonderland Customer';
         freshAvatar = profileRes.data.avatar_url || null;
-        freshBirthday = profileRes.data.birthday || null;
-        freshGender = profileRes.data.gender || null;
       }
 
       if (walletRes.data) {
@@ -103,8 +93,6 @@ export default function AccountContent() {
       setAvatarUrl(freshAvatar);
       setWalletBalance(freshBalance);
       setOrderCount(freshOrders);
-      setBirthday(freshBirthday);
-      setGender(freshGender);
 
       // Silently update cache for the next app open
       await saveToCache({
@@ -113,8 +101,6 @@ export default function AccountContent() {
         avatarUrl: freshAvatar,
         walletBalance: freshBalance,
         orderCount: freshOrders,
-        birthday: freshBirthday,
-        gender: freshGender,
       });
 
     } catch (error) {
@@ -171,8 +157,6 @@ export default function AccountContent() {
     setAvatarUrl(null);
     setWalletBalance(null);
     setOrderCount(0);
-    setBirthday(null);
-    setGender(null);
   };
 
   const onRefresh = async () => {
@@ -201,18 +185,24 @@ export default function AccountContent() {
   const clearAllSession = async () => {
     setLoggingOut(true);
     try {
+      // 1. Ask Supabase to sign out and invalidate the refresh token server-side.
       await supabase.auth.signOut();
     } catch (e) {
       console.error('signOut error:', e);
     }
 
     try {
+      // 2. Clear our own app-level cache key.
       await storage.removeItem(CACHE_KEY);
     } catch (e) {
       console.error('cache clear error:', e);
     }
 
     try {
+      // 3. Belt-and-braces: wipe any lingering Supabase auth keys directly from
+      // localStorage. supabase-js stores its session under a key like
+      // "sb-<project-ref>-auth-token" — if one is stale it can make the
+      // session appear to "come back" after reload.
       if (typeof localStorage !== 'undefined') {
         Object.keys(localStorage)
           .filter((k) => k.startsWith('sb-'))
@@ -222,11 +212,14 @@ export default function AccountContent() {
       console.error('localStorage clear error:', e);
     }
 
+    // 4. Reset in-memory UI state immediately.
     setIsLoggedIn(false);
     resetGuestState();
     setShowLogoutModal(false);
     setLoggingOut(false);
 
+    // 5. Full reload guarantees the Supabase client re-initializes from a
+    // clean slate — no stale in-memory session can linger.
     if (typeof window !== 'undefined') {
       window.location.reload();
     }
@@ -272,6 +265,7 @@ export default function AccountContent() {
             <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
           </TouchableOpacity>
 
+          {/* Renders instantly with Cached Data or placeholders. No more UI flashes! */}
           <>
             {/* Profile Row */}
             <TouchableOpacity
@@ -293,15 +287,6 @@ export default function AccountContent() {
                   <Text style={styles.menuSubtitle}>
                     {isLoggedIn ? userEmail : 'Sign in to personalize your experience'}
                   </Text>
-                  {/* Dynamic Meta Tag to showcase active birthday/gender data contextually */}
-                  {isLoggedIn && (birthday || gender) && (
-                    <Text style={styles.profileMetaText}>
-                      {[
-                        gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : null,
-                        birthday ? `Born: ${birthday}` : null
-                      ].filter(Boolean).join('  •  ')}
-                    </Text>
-                  )}
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
@@ -501,12 +486,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 18,
   },
-  profileMetaText: {
-    fontSize: 12,
-    color: '#8b5cf6',
-    fontWeight: '500',
-    marginTop: 4,
-  },
   logoutItem: { borderWidth: 1.5, borderColor: '#fecaca' },
   loginItem: { borderWidth: 1.5, borderColor: '#bfdbfe' },
   logoutText: { color: '#dc2626' },
@@ -578,4 +557,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
