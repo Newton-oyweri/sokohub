@@ -106,7 +106,7 @@ export default function CategoryTabs() {
       }
     } catch (err: any) {
       console.error('Error fetching component data:', err.message);
-      setCategoriesError('Could not load categories.');
+      setCategoriesError('Could not load categories.Check your internet connection!');
     } finally {
       setCategoriesLoading(false);
     }

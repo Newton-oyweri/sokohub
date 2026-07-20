@@ -245,26 +245,6 @@ export default function AccountContent() {
       >
         <View style={styles.menuContainer}>
 
-          {/* Games Card */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={() => router.push('/games')}
-          >
-            <View style={styles.menuLeftContent}>
-              <View style={[styles.iconContainer, { backgroundColor: '#fcd34d' }]}>
-                <Ionicons name="game-controller-outline" size={28} color="#78350f" />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>Games</Text>
-                <Text style={styles.menuSubtitle}>
-                  Play & earn rewards for your next cake order!
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#9ca3af" />
-          </TouchableOpacity>
-
           {/* Renders instantly with Cached Data or placeholders. No more UI flashes! */}
           <>
             {/* Profile Row */}
@@ -557,3 +537,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

@@ -10,7 +10,6 @@ import {
   Platform,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -255,6 +254,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: 16,
   },
+  amountInput: {
+  flex: 1,
+  paddingVertical: 16,
+  fontSize: 22,
+  fontWeight: '700',
+  color: '#1f2937',
+  height: 60,
+  // Fix web focus outline:
+  outlineStyle: 'none',
+},
+
   securityText: {
     fontSize: 11,
     color: '#10b981',
@@ -287,14 +297,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1f2937',
     marginRight: 8,
-  },
-  amountInput: {
-    flex: 1,
-    paddingVertical: 16,
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1f2937',
-    height: 60,
   },
   phoneSection: {
     marginBottom: 20,

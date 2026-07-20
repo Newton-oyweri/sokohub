@@ -33,8 +33,11 @@ export default function UserProfile() {
   const [avatarUrl, setAvatarUrl] = useState(AVATARS[0].url);
   const [isChoosingAvatar, setIsChoosingAvatar] = useState(false);
 
-  // New Profile States
-  const [birthday, setBirthday] = useState(''); // Holds formatted text 'YYYY-MM-DD'
+  // Separate Date Input States for smooth segment entry
+  const [birthYear, setBirthYear] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+  
   const [gender, setGender] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,8 +65,21 @@ export default function UserProfile() {
         setName(data.full_name || '');
         setPhone(data.phone || '');
         setAvatarUrl(data.avatar_url || AVATARS[0].url);
-        setBirthday(data.birthday || '');
         setGender(data.gender || null);
+
+        // Split 'YYYY-MM-DD' from DB into separate fields
+        if (data.birthday) {
+          const parts = data.birthday.split('-');
+          if (parts.length === 3) {
+            setBirthYear(parts[0]);
+            setBirthMonth(parts[1]);
+            setBirthDay(parts[2]);
+          }
+        } else {
+          setBirthYear('');
+          setBirthMonth('');
+          setBirthDay('');
+        }
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to fetch profile.');
@@ -78,13 +94,36 @@ export default function UserProfile() {
       return;
     }
 
-    // Basic date structure check if the user typed something into birthday
-    if (birthday.trim().length > 0) {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(birthday.trim())) {
-        Alert.alert('Validation Error', 'Please enter a birthday using the YYYY-MM-DD format.');
+    // Build & Validate Birthday string if any segment is typed
+    let formattedBirthday: string | null = null;
+    if (birthYear || birthMonth || birthDay) {
+      if (!birthYear || !birthMonth || !birthDay) {
+        Alert.alert('Validation Error', 'Please complete all birthday fields (Year, Month, and Day).');
         return;
       }
+
+      const y = parseInt(birthYear, 10);
+      const m = parseInt(birthMonth, 10);
+      const d = parseInt(birthDay, 10);
+
+      const currentYear = new Date().getFullYear();
+      if (y < 1920 || y > currentYear) {
+        Alert.alert('Validation Error', `Please enter a valid year between 1920 and ${currentYear}.`);
+        return;
+      }
+      if (m < 1 || m > 12) {
+        Alert.alert('Validation Error', 'Please enter a valid month (1-12).');
+        return;
+      }
+      if (d < 1 || d > 31) {
+        Alert.alert('Validation Error', 'Please enter a valid day (1-31).');
+        return;
+      }
+
+      // Pad month & day with leading zeros (e.g., 5 -> '05')
+      const paddedM = m < 10 ? `0${m}` : `${m}`;
+      const paddedD = d < 10 ? `0${d}` : `${d}`;
+      formattedBirthday = `${y}-${paddedM}-${paddedD}`;
     }
 
     setIsSaving(true);
@@ -96,7 +135,7 @@ export default function UserProfile() {
           full_name: name.trim(),
           phone: phone.trim(),
           avatar_url: avatarUrl,
-          birthday: birthday.trim() || null,
+          birthday: formattedBirthday,
           gender: gender || null,
           updated_at: new Date().toISOString()
         });
@@ -116,6 +155,13 @@ export default function UserProfile() {
     setIsEditing(false);
     setIsChoosingAvatar(false);
     fetchUserProfile();
+  };
+
+  const getFormattedBirthdayDisplay = () => {
+    if (birthYear && birthMonth && birthDay) {
+      return `${birthYear}-${birthMonth.padStart(2, '0')}-${birthDay.padStart(2, '0')}`;
+    }
+    return 'Not set';
   };
 
   if (isLoading) {
@@ -229,25 +275,66 @@ export default function UserProfile() {
             )}
           </View>
 
-          {/* Birthday Field */}
+          {/* Segmented Birthday Inputs */}
           <View style={styles.field}>
             <Text style={styles.label}>Birthday</Text>
             {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={birthday}
-                onChangeText={setBirthday}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#94a3b8"
-                maxLength={10}
-                editable={!isSaving}
-              />
+              <View style={styles.dateRow}>
+                {/* Year Segment */}
+                <View style={[styles.dateInputWrapper, { flex: 1.4 }]}>
+                  <Text style={styles.dateSegmentLabel}>YYYY</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={birthYear}
+                    onChangeText={setBirthYear}
+                    placeholder="1998"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    editable={!isSaving}
+                  />
+                </View>
+
+                <Text style={styles.dateSeparator}>/</Text>
+
+                {/* Month Segment */}
+                <View style={[styles.dateInputWrapper, { flex: 1 }]}>
+                  <Text style={styles.dateSegmentLabel}>MM</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={birthMonth}
+                    onChangeText={setBirthMonth}
+                    placeholder="05"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    editable={!isSaving}
+                  />
+                </View>
+
+                <Text style={styles.dateSeparator}>/</Text>
+
+                {/* Day Segment */}
+                <View style={[styles.dateInputWrapper, { flex: 1 }]}>
+                  <Text style={styles.dateSegmentLabel}>DD</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={birthDay}
+                    onChangeText={setBirthDay}
+                    placeholder="24"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    editable={!isSaving}
+                  />
+                </View>
+              </View>
             ) : (
-              <Text style={styles.value}>{birthday || 'Not set'}</Text>
+              <Text style={styles.value}>{getFormattedBirthdayDisplay()}</Text>
             )}
           </View>
 
-          {/* Gender Field */}
+          {/* Gender Segmented Picker */}
           <View style={[styles.field, styles.lastField]}>
             <Text style={styles.label}>Gender</Text>
             {isEditing ? (
@@ -480,6 +567,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ede9fe',
     marginTop: 2,
+  },
+  // Date Picker Segment Styles
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
+  },
+  dateInputWrapper: {
+    alignItems: 'center',
+  },
+  dateSegmentLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginBottom: 2,
+  },
+  dateInput: {
+    width: '100%',
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
+    backgroundColor: '#f8f6ff',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ede9fe',
+  },
+  dateSeparator: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#cbd5e1',
+    marginTop: 14,
   },
   genderContainer: {
     flexDirection: 'row',
