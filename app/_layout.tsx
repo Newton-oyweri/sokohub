@@ -1,22 +1,30 @@
 import React, { useEffect } from 'react';
-import { 
-  StatusBar, 
-  Linking, 
-  View, 
-  StyleSheet, 
+import {
+  StatusBar,
+  Linking,
+  View,
+  StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, SplashScreen } from 'expo-router';
+import { useFonts } from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const WIDE_LAYOUT_BREAKPOINT = 900;
 const APP_COLUMN_WIDTH = 480;
 
+SplashScreen.preventAutoHideAsync();
+
 export default function RootLayout() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isWideLayout = width >= WIDE_LAYOUT_BREAKPOINT;
+
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
 
   useEffect(() => {
     supabase.auth.getSession();
@@ -32,7 +40,7 @@ export default function RootLayout() {
       // If it's a password recovery link, route the user to the dedicated screen
       if (url.includes('/auth/v1/verify') || url.includes('type=recovery') || url.includes('error=')) {
         const hashPart = url.split('#')[1] || url.split('?')[1];
-        
+
         // Forward to the reset-password screen along with the URL fragment payload
         router.replace({
           pathname: '/reset-password',
@@ -51,6 +59,16 @@ export default function RootLayout() {
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   const appContent = (
     <>
@@ -87,19 +105,12 @@ const styles = StyleSheet.create({
   wideRoot: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#ede9fe',
-  },
-  wideAppColumn: {
-    width: APP_COLUMN_WIDTH,
-    height: '100%',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
   },
   brandingPanel: {
     flex: 1,
-    backgroundColor: '#ede9fe',
+  },
+  wideAppColumn: {
+    width: APP_COLUMN_WIDTH,
+    flex: 0,
   },
 });
