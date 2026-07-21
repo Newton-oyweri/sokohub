@@ -17,7 +17,7 @@
     "web": {
   "bundler": "metro",
   "output": "single",
-  "favicon": "./assets/images/icon.png",
+  "favicon": "/pwaicon.png",
   "pwa": {
     "name": "Wonderbakes",
     "shortName": "Wonderbakes", "themeColor": "#6b46c1",
