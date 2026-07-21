@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import {
   View,
@@ -22,6 +22,27 @@ import Electronics from './../../Services/Electronics';
 import { useHomeScreen, CATEGORIES, CategoryKey } from './useHomeScreen';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
+
+// Detects whether the app is running installed as a PWA (web only).
+// Native apps (iOS/Android) never match this, so we bail out early
+// via Platform.OS check — window.matchMedia doesn't exist on native.
+function useIsPWA() {
+  const [isPWA, setIsPWA] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return; // native app is never "PWA"
+
+    const standalone =
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches) ||
+      // @ts-ignore - iOS Safari specific
+      window.navigator.standalone === true;
+
+    setIsPWA(standalone);
+  }, []);
+
+  return isPWA;
+}
 
 // Simple mock placeholder shown for every category that doesn't have
 // real content yet. Swap these out for real components as each
@@ -87,9 +108,11 @@ export default function App() {
     extrapolate: 'clamp',
   });
 
+  const isPWA = useIsPWA();
+
   return (
     <>
-      <DownloadAction />
+      {Platform.OS === 'web' && !isPWA && <DownloadAction />}
       <View style={styles.container}>
         <View style={[styles.headerBackground, { paddingTop: STATUS_BAR_HEIGHT }]}>
           <Header />
@@ -211,6 +234,7 @@ export default function App() {
     </>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
