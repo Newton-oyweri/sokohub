@@ -16,8 +16,7 @@
     "platforms":["android", "web"],
     "web": {
   "bundler": "metro",
-  "output": "single",
-  "favicon": "./assets/images/icon.png" 
+  "output": "single"
 },
     "android": {
       "adaptiveIcon": {
