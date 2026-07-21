@@ -17,14 +17,7 @@
     "web": {
   "bundler": "metro",
   "output": "single",
-  "favicon": "./assets/images/icon.png",
-  "pwa": {
-    "name": "Wonderbakes",
-    "shortName": "Wonderbakes", "themeColor": "#6b46c1",
-    "backgroundColor": "#ffffff",
-    "display": "standalone",
-    "startUrl": "/"
-  }
+  "favicon": "./assets/images/icon.png" 
 },
     "android": {
       "adaptiveIcon": {
