@@ -43,7 +43,6 @@ function CategoryContent({ category }: { category: CategoryKey }) {
   if (category === 'bakery') {
     return (
       <>
-        <Text style={styles.bakeryPrompt}>What's your dessert today?</Text>
         <CakeCarousel />
       </>
     );
@@ -80,6 +79,13 @@ export default function App() {
     greetingOpacity,
     scrollY,
   } = useHomeScreen();
+
+  // Create an animated opacity for the category row based on scroll
+  const categoryOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT - 60],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
     <>
@@ -147,35 +153,36 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Category row — only relevant while on the Shop tab */}
-            {activeTab === 'cakes' && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryRow}
-              >
-                {CATEGORIES.map((cat) => {
-                  const isActive = activeCategory === cat.key;
-                  return (
-                    <TouchableOpacity
-                      key={cat.key}
-                      style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                      onPress={() => handleCategoryPress(cat.key)}
-                      activeOpacity={0.8}
-                    >
-                
-                      <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
-                        {cat.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
           </View>
 
           <View style={styles.contentCard}>
+            {/* Category row - now inside contentCard, below tabs */}
+            {activeTab === 'cakes' && (
+              <Animated.View style={{ opacity: categoryOpacity }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryRow}
+                >
+                  {CATEGORIES.map((cat) => {
+                    const isActive = activeCategory === cat.key;
+                    return (
+                      <TouchableOpacity
+                        key={cat.key}
+                        style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                        onPress={() => handleCategoryPress(cat.key)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </Animated.View>
+            )}
+
             <View style={styles.contentBody}>
               {activeTab === 'cakes' ? (
                 <CategoryContent category={activeCategory} />
@@ -209,6 +216,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F4FF',
+    
   },
   headerBackground: {
     position: 'absolute',
@@ -291,12 +299,13 @@ const styles = StyleSheet.create({
   categoryRow: {
     paddingHorizontal: 20,
     paddingTop: 14,
+    paddingBottom: 8,
     gap: 10,
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F4FF',
+    backgroundColor: 'transparent',
     borderRadius: 18,
     paddingVertical: 8,
     paddingHorizontal: 14,

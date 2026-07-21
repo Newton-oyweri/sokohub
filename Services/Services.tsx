@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,50 +6,20 @@ import {
   StyleSheet,
   FlatList,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 
-type ServiceItem = {
+// Import central Supabase client via path alias
+import { supabase } from '@/lib/supabase';
+
+export type ServiceItem = {
   id: string;
   name: string;
-  startingFrom: number;
+  price: number;
+  description?: string;
 };
 
-// Pricing follows a simple tiered rule of thumb:
-// 150 — quick pickups/deliveries/shopping
-// 250-300 — tasks taking roughly 30-60 minutes
-// 500-800 — longer or more physically demanding services
-const SERVICES: ServiceItem[] = [
-  { id: 'laundry', name: 'Laundry', startingFrom: 250 },
-  { id: 'grocery-shopping', name: 'Grocery shopping', startingFrom: 150 },
-  { id: 'queue-standing', name: 'Queue standing', startingFrom: 300 },
-  { id: 'medicine-pickup', name: 'Medicine pickup', startingFrom: 150 },
-  { id: 'food-pickup', name: 'Food pickup', startingFrom: 150 },
-  { id: 'parcel-pickup', name: 'Parcel pickup', startingFrom: 150 },
-  { id: 'parcel-dropoff', name: 'Parcel drop-off', startingFrom: 150 },
-  { id: 'document-delivery', name: 'Document delivery', startingFrom: 150 },
-  { id: 'key-pickup-dropoff', name: 'Key pickup/drop-off', startingFrom: 150 },
-  { id: 'house-cleaning', name: 'House cleaning', startingFrom: 800 },
-  { id: 'room-cleaning', name: 'Room cleaning', startingFrom: 500 },
-  { id: 'ironing-clothes', name: 'Ironing clothes', startingFrom: 250 },
-  { id: 'water-delivery', name: 'Water fetching / delivery', startingFrom: 200 },
-  { id: 'trash-disposal', name: 'Trash disposal', startingFrom: 150 },
-  { id: 'compound-cleaning', name: 'Compound cleaning', startingFrom: 300 },
-  { id: 'garden-watering', name: 'Garden watering', startingFrom: 200 },
-  { id: 'personal-shopping', name: 'Personal shopping', startingFrom: 200 },
-  { id: 'gift-delivery', name: 'Gift delivery', startingFrom: 200 },
-  { id: 'book-pickup', name: 'Book or package pickup', startingFrom: 150 },
-  { id: 'moving-assistance', name: 'Moving assistance (small items)', startingFrom: 500 },
-  { id: 'car-wash', name: 'Car wash', startingFrom: 400 },
-  { id: 'meal-preparation', name: 'Meal preparation', startingFrom: 500 },
-  { id: 'cooking-assistance', name: 'Cooking assistance', startingFrom: 400 },
-  { id: 'babysitting', name: 'Babysitting', startingFrom: 600 },
-  { id: 'elderly-assistance', name: 'Elderly assistance', startingFrom: 600 },
-  { id: 'shop-errand', name: 'Shop errand', startingFrom: 150 },
-  { id: 'school-pickup', name: 'School item pickup', startingFrom: 150 },
-  { id: 'bank-errand', name: 'Bank errand', startingFrom: 200 },
-  { id: 'event-assistance', name: 'Event errand assistance', startingFrom: 400 },
-  { id: 'other-task', name: 'Other task', startingFrom: 150 },
-];
 function formatKES(amount: number) {
   return `KSh ${amount.toLocaleString('en-KE')}`;
 }
@@ -57,15 +27,75 @@ function formatKES(amount: number) {
 type Props = {
   onSelectService?: (service: ServiceItem) => void;
   onSubmitCustomTask?: (taskDescription: string) => void;
+  sellerId?: string;
 };
 
-export default function Services({ onSelectService, onSubmitCustomTask }: Props) {
+export default function Services({ onSelectService, onSubmitCustomTask, sellerId }: Props) {
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [customTask, setCustomTask] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleCustomTaskSubmit = () => {
+  useEffect(() => {
+    fetchServices();
+  }, []);
+
+  const fetchServices = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price, description')
+        .eq('post_type', 'booking')
+        .eq('is_available', true)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      if (data) setServices(data as ServiceItem[]);
+    } catch (err: any) {
+      console.error('Error fetching services:', err.message);
+      Alert.alert('Error', 'Unable to load services. Please check your network connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCustomTaskSubmit = async () => {
     if (!customTask.trim()) return;
-    onSubmitCustomTask?.(customTask.trim());
-    setCustomTask('');
+
+    const taskText = customTask.trim();
+
+    if (onSubmitCustomTask) {
+      onSubmitCustomTask(taskText);
+      setCustomTask('');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const { error } = await supabase.from('products').insert([
+        {
+          seller_id: sellerId || 'fc880aa8-accf-43ad-bb05-9d025d9d74c7',
+          name: taskText,
+          description: 'Custom requested task',
+          price: 150.0,
+          category: 'events',
+          rating: 5.0,
+          is_available: true,
+          post_type: 'booking',
+        },
+      ]);
+
+      if (error) throw error;
+
+      Alert.alert('Request Sent', 'Your custom task request has been received!');
+      setCustomTask('');
+      fetchServices();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not send request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderItem = ({ item }: { item: ServiceItem }) => (
@@ -77,7 +107,7 @@ export default function Services({ onSelectService, onSubmitCustomTask }: Props)
       <Text style={styles.name}>{item.name}</Text>
       <View style={styles.priceWrap}>
         <Text style={styles.priceLabel}>Starting from</Text>
-        <Text style={styles.priceValue}>{formatKES(item.startingFrom)}</Text>
+        <Text style={styles.priceValue}>{formatKES(item.price)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -86,7 +116,6 @@ export default function Services({ onSelectService, onSubmitCustomTask }: Props)
     <View>
       <Text style={styles.heading}>Services</Text>
 
-      {/* Info Card Clarifying One-Time Pricing */}
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>ℹ️ Pricing Notice</Text>
         <Text style={styles.infoText}>
@@ -111,27 +140,45 @@ export default function Services({ onSelectService, onSubmitCustomTask }: Props)
           onChangeText={setCustomTask}
         />
         <TouchableOpacity
-          style={[styles.submitButton, !customTask.trim() && styles.disabledButton]}
-          disabled={!customTask.trim()}
+          style={[styles.submitButton, (!customTask.trim() || submitting) && styles.disabledButton]}
+          disabled={!customTask.trim() || submitting}
           onPress={handleCustomTaskSubmit}
         >
-          <Text style={styles.submitButtonText}>Request</Text>
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.submitButtonText}>Request</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#6B46C1" />
+        <Text style={styles.loaderText}>Loading live services...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={SERVICES}
+        data={services}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={renderHeader}
         ListFooterComponent={renderFooter}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+        ListEmptyComponent={
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>No active services found in database.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -139,8 +186,18 @@ export default function Services({ onSelectService, onSubmitCustomTask }: Props)
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#F9FAFB',
+    paddingBottom:56,
+  },
+  loaderContainer: {
+    paddingVertical: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loaderText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#6B7280',
   },
   listContent: {
     paddingHorizontal: 20,
@@ -213,7 +270,14 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F3F4F6',
   },
-  /* Custom Task Input Styles */
+  emptyWrap: {
+    paddingVertical: 30,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
   customTaskContainer: {
     marginTop: 24,
     padding: 16,
