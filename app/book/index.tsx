@@ -43,6 +43,8 @@ export default function BookWeddingCake() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+const [pendingGuestCount, setPendingGuestCount] = useState<number | null>(null);
 
   // --- In-App Notification State ---
   const [notification, setNotification] = useState<{
@@ -158,19 +160,27 @@ export default function BookWeddingCake() {
     fetchUserData(); // Re-fetches user/profile info
   };
 
-  const handleBooking = async () => {
+const handleBooking = () => {
     if (!user) {
       router.push('/auth');
       return;
     }
 
-    try {
-      const guestCount = parseInt(guests);
-      if (!guests || isNaN(guestCount) || guestCount < 1) {
-        showInAppNotification('Please enter a valid number of guests', 'error');
-        return;
-      }
+    const guestCount = parseInt(guests);
+    if (!guests || isNaN(guestCount) || guestCount < 1) {
+      showInAppNotification('Please enter a valid number of guests', 'error');
+      return;
+    }
 
+    setPendingGuestCount(guestCount);
+    setShowConfirmModal(true);
+  };
+
+  const submitBooking = async () => {
+    if (pendingGuestCount === null) return;
+    setShowConfirmModal(false);
+
+    try {
       setSubmitting(true);
 
       const bookingNotes = `
@@ -179,7 +189,7 @@ export default function BookWeddingCake() {
         Customer Name: ${profile?.full_name || 'Not provided'}
         ---
         Booking Details:
-        Guests: ${guests}
+        Guests: ${pendingGuestCount}
         Needed by: ${duration}
         Special Requests: ${notes || 'None'}
       `.trim();
@@ -195,16 +205,13 @@ export default function BookWeddingCake() {
 
       if (orderError) throw orderError;
 
-      // 1. Show In-App Banner Notification with Timeout
       showInAppNotification('Booking submitted successfully! We will contact you shortly.', 'success', 4000);
-
-      // 2. Reset fields and refresh data
       resetFormAndRefresh();
-
     } catch (error: any) {
       showInAppNotification(error.message || 'Booking failed. Please try again.', 'error');
     } finally {
       setSubmitting(false);
+      setPendingGuestCount(null);
     }
   };
 
@@ -258,7 +265,35 @@ export default function BookWeddingCake() {
           <Text style={styles.notificationText}>{notification.message}</Text>
         </View>
       )}
-
+<Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.ConfirmmodalOverlay}>
+          <View style={styles.confirmModalCard}>
+            <Text style={styles.confirmModalTitle}>Confirm Booking</Text>
+            <Text style={styles.confirmModalMessage}>
+              Book {productName} for {pendingGuestCount} guest{pendingGuestCount !== 1 ? 's' : ''}, needed by {duration}?
+            </Text>
+            <View style={styles.confirmModalActions}>
+              <TouchableOpacity
+                style={[styles.confirmModalButton, styles.confirmModalCancel]}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalButton, styles.confirmModalConfirm]}
+                onPress={submitBooking}
+              >
+                <Text style={styles.confirmModalConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -739,6 +774,57 @@ const styles = StyleSheet.create({
   },
   datePicker: {
     height: 200,
+  }
+   ,
+  ConfirmmodalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  } ,
+  confirmModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#1e293b',
+  },
+  confirmModalMessage: {
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  confirmModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  confirmModalCancel: {
+    backgroundColor: '#f1f5f9',
+  },
+  confirmModalConfirm: {
+    backgroundColor: '#6b46c1',
+  },
+  confirmModalCancelText: {
+    color: '#475569',
+    fontWeight: '600',
+  },
+  confirmModalConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 
