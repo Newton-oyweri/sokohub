@@ -14,9 +14,9 @@
     "scheme": "sokohub",
     "userInterfaceStyle": "automatic",
     "platforms":["android", "web"],
-    "web": {
+"web": {
   "bundler": "metro",
-  "output": "single"
+  "output": "static"
 },
     "android": {
       "adaptiveIcon": {
