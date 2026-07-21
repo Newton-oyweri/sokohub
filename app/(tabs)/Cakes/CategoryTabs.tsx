@@ -63,11 +63,14 @@ export default function CategoryTabs() {
       setCategoriesError(null);
 
       // 1. Fetch Categories
-      const categoriesPromise = supabase
-        .from('categories')
-        .select('id, name, subtitle, image_url')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      // 1. Fetch Categories filtered by the parent domain
+const categoriesPromise = supabase
+  .from('categories')
+  .select('id, name, subtitle, image_url')
+  .eq('product_category_id', 'cake-bakery') // <-- ADD THIS FILTER
+  .eq('is_active', true)
+  .order('display_order', { ascending: true });
+
 
       // 2. First get the total count of valid booking products for a true random offset range
       const countPromise = supabase
