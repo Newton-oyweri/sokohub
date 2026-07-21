@@ -16,6 +16,9 @@ import CakeCarousel from './Cakes/CakeCarousel';
 import Account from './Account/Account';
 import Header, { HEADER_HEIGHT } from '../../components/Header';
 import DownloadAction from '../../components/DownloadAction';
+import Services from './../../Services/Services';
+import Fashion from './../../Services/Fashion';
+import Electronics from './../../Services/Electronics';
 import { useHomeScreen, CATEGORIES, CategoryKey } from './useHomeScreen';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
@@ -40,10 +43,20 @@ function CategoryContent({ category }: { category: CategoryKey }) {
   if (category === 'bakery') {
     return (
       <>
-        <Text style={styles.bakeryPrompt}>What's your dessert today? 🍰</Text>
+        <Text style={styles.bakeryPrompt}>What's your dessert today?</Text>
         <CakeCarousel />
       </>
     );
+  }
+    if (category === 'services') {
+    return <Services />;
+  }
+  if (category === 'electronics') {
+    return <Electronics />;
+  }
+
+  if (category === 'fashion') {
+    return <Fashion />;
   }
 
   const meta = CATEGORIES.find((c) => c.key === category)!;

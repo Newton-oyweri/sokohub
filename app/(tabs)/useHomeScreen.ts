@@ -13,8 +13,6 @@ export type CategoryKey =
 
 export const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] = [
   { key: 'bakery', label: 'Cakes & Bakery'},
-  { key: 'flowers', label: 'Flowers & Gifts'},
-  { key: 'groceries', label: 'Groceries'},
   { key: 'fashion', label: 'Fashion'},
   { key: 'electronics', label: 'Electronics'},
   { key: 'services', label: 'Services'},
