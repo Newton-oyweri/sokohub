@@ -14,6 +14,18 @@
     "scheme": "sokohub",
     "userInterfaceStyle": "automatic",
     "platforms":["android", "web"],
+    "web": {
+  "bundler": "metro",
+  "output": "single",
+  "favicon": "./assets/images/icon.png",
+  "pwa": {
+    "name": "Wonderbakes",
+    "shortName": "Wonderbakes", "themeColor": "#6b46c1",
+    "backgroundColor": "#ffffff",
+    "display": "standalone",
+    "startUrl": "/"
+  }
+},
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
