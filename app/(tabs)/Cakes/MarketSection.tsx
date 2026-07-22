@@ -75,7 +75,6 @@ export default function MarketSection() {
 
 const styles = StyleSheet.create({
   marketContainer: {
-    paddingHorizontal: 16,
     marginTop: 8,
   },
   centerContainer: {
