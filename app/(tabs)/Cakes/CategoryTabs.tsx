@@ -9,12 +9,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import Quickorder from './Quickorder';
+import ProductFilters from './ProductFilters';
 
 type Product = {
   id: string;
@@ -27,17 +27,32 @@ type Product = {
   post_type?: string;
 };
 
-// Dynamic height variants based on screen width
+type Category = {
+  id: string;
+  name: string;
+  subtitle?: string;
+  image_url?: string;
+};
+
 const getHeightVariants = (width: number) => {
   const isLargeScreen = width > 600;
   const isTablet = width > 900;
-  
+
   if (isTablet) return [340, 280, 310, 260, 320];
   if (isLargeScreen) return [300, 240, 270, 220, 290];
-  return [280, 220, 250, 200, 260]; // Default for phones
+  return [280, 220, 250, 200, 260];
 };
 
 const PAGE_SIZE = 12;
+
+// Price range mapping
+const PRICE_RANGES = {
+  'all': { min: null, max: null },
+  'below1000': { min: 0, max: 1000 },
+  '1000-2000': { min: 1000, max: 2000 },
+  '2000-3000': { min: 2000, max: 3000 },
+  'above3000': { min: 3000, max: null },
+};
 
 export default function CategoryTabs() {
   const router = useRouter();
@@ -53,13 +68,18 @@ export default function CategoryTabs() {
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(2);
 
+  // Filter states
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [allCategoryIds, setAllCategoryIds] = useState<string[]>([]);
+  const [selectedPriceRange, setSelectedPriceRange] = useState<string | null>('all');
+
   const fetchingRef = useRef(false);
   const isNavigating = useRef(false);
 
   useEffect(() => {
     initialLoad();
 
-    // Handle screen dimension changes
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setScreenWidth(window.width);
       updateNumColumns(window.width);
@@ -70,11 +90,11 @@ export default function CategoryTabs() {
 
   const updateNumColumns = (width: number) => {
     if (width > 1024) {
-      setNumColumns(4); // Tablet landscape / large screens
+      setNumColumns(4);
     } else if (width > 768) {
-      setNumColumns(3); // Tablets
+      setNumColumns(3);
     } else {
-      setNumColumns(2); // Phones
+      setNumColumns(2);
     }
   };
 
@@ -86,7 +106,25 @@ export default function CategoryTabs() {
       .eq('is_active', true);
 
     if (error) throw error;
-    return (data || []).map((cat) => cat.id);
+    const ids = (data || []).map((cat) => cat.id);
+    setAllCategoryIds(ids);
+    return ids;
+  };
+
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name, subtitle, image_url')
+        .eq('product_category_id', 'cake-bakery')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (err) {
+      console.warn('Error fetching subcategories:', err);
+    }
   };
 
   const fetchProducts = async (pageToFetch: number, append: boolean) => {
@@ -99,9 +137,18 @@ export default function CategoryTabs() {
       }
       setError(null);
 
-      const categoryIds = await fetchCakeCategoryIds();
+      let categoryIds = allCategoryIds;
 
       if (categoryIds.length === 0) {
+        categoryIds = await fetchCakeCategoryIds();
+      }
+
+      let targetCategoryIds = categoryIds;
+      if (selectedSubcategory && categoryIds.includes(selectedSubcategory)) {
+        targetCategoryIds = [selectedSubcategory];
+      }
+
+      if (targetCategoryIds.length === 0) {
         setProducts([]);
         setHasMore(false);
         return;
@@ -110,11 +157,23 @@ export default function CategoryTabs() {
       const from = pageToFetch * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      const { data, error: prodErr } = await supabase
+      // Build query with price filter
+      let query = supabase
         .from('products')
         .select('*')
-        .in('category', categoryIds)
-        .eq('is_available', true)
+        .in('category', targetCategoryIds)
+        .eq('is_available', true);
+
+      // Apply price filters
+      const priceRange = PRICE_RANGES[selectedPriceRange as keyof typeof PRICE_RANGES];
+      if (priceRange && priceRange.min !== null) {
+        query = query.gte('price', priceRange.min);
+      }
+      if (priceRange && priceRange.max !== null) {
+        query = query.lte('price', priceRange.max);
+      }
+
+      const { data, error: prodErr } = await query
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -165,6 +224,8 @@ export default function CategoryTabs() {
   };
 
   const initialLoad = async () => {
+    await fetchSubcategories();
+    await fetchCakeCategoryIds();
     fetchBookingBanner();
     await fetchProducts(0, false);
   };
@@ -188,6 +249,21 @@ export default function CategoryTabs() {
     setTimeout(() => {
       isNavigating.current = false;
     }, 500);
+  };
+
+  // Filter handlers
+  const handlePriceFilterChange = (range: string | null) => {
+    setSelectedPriceRange(range);
+    setPage(0);
+    setHasMore(true);
+    fetchProducts(0, false);
+  };
+
+  const handleSubcategoryChange = (categoryId: string | null) => {
+    setSelectedSubcategory(categoryId);
+    setPage(0);
+    setHasMore(true);
+    fetchProducts(0, false);
   };
 
   const getProductImage = (item: Product) => {
@@ -237,23 +313,86 @@ export default function CategoryTabs() {
     );
   };
 
-  // Render products in a responsive grid
   const renderResponsiveGrid = useCallback(() => {
     const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
     const isTablet = screenWidth > 768;
-    
-    // For tablet, use a different layout
-    if (isTablet) {
-      // Split into columns for tablet
-      const columns = numColumns;
-      const columnItems: Product[][] = Array.from({ length: columns }, () => []);
-      
-      products.forEach((item, index) => {
-        const columnIndex = index % columns;
-        columnItems[columnIndex].push(item);
-      });
 
+    if (!isTablet) {
       return (
+        <View style={styles.masonryContainer}>
+          <View style={styles.masonryColumn}>
+            {products
+              .filter((_, i) => i % 2 === 0)
+              .map((item, i) => {
+                const height = HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length];
+                return renderProductCard(item, height);
+              })}
+          </View>
+
+          <View style={styles.masonryColumn}>
+            <TouchableOpacity
+              style={[styles.tabCard, styles.bookingCard]}
+              onPress={handleBookingPress}
+              activeOpacity={0.92}
+            >
+              {bookingImageUrl && (
+                <>
+                  <Image
+                    source={{ uri: bookingImageUrl }}
+                    style={StyleSheet.absoluteFillObject}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.bookingImageOverlay} />
+                </>
+              )}
+              <View style={styles.bookingCardContent}>
+                <Text style={styles.bookingQuestion}>Got an event?</Text>
+                <Text style={styles.bookingAction}>Book now!</Text>
+              </View>
+            </TouchableOpacity>
+
+            {products
+              .filter((_, i) => i % 2 === 1)
+              .map((item, i) => {
+                const height = HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length];
+                return renderProductCard(item, height);
+              })}
+          </View>
+        </View>
+      );
+    }
+
+    const columns = numColumns;
+    const columnItems: Product[][] = Array.from({ length: columns }, () => []);
+
+    products.forEach((item, index) => {
+      const columnIndex = index % columns;
+      columnItems[columnIndex].push(item);
+    });
+
+    return (
+      <View>
+        <TouchableOpacity
+          style={[styles.tabCard, styles.bookingCardTablet]}
+          onPress={handleBookingPress}
+          activeOpacity={0.92}
+        >
+          {bookingImageUrl && (
+            <>
+              <Image
+                source={{ uri: bookingImageUrl }}
+                style={StyleSheet.absoluteFillObject}
+                resizeMode="cover"
+              />
+              <View style={styles.bookingImageOverlay} />
+            </>
+          )}
+          <View style={styles.bookingCardContent}>
+            <Text style={styles.bookingQuestion}>Got an event?</Text>
+            <Text style={styles.bookingAction}>Book now!</Text>
+          </View>
+        </TouchableOpacity>
+
         <View style={[styles.tabletGrid, { gap: 12 }]}>
           {columnItems.map((column, colIndex) => (
             <View key={`col-${colIndex}`} style={[styles.tabletColumn, { flex: 1 / columns }]}>
@@ -263,50 +402,6 @@ export default function CategoryTabs() {
               })}
             </View>
           ))}
-        </View>
-      );
-    }
-
-    // Phone layout - original masonry
-    return (
-      <View style={styles.masonryContainer}>
-        <View style={styles.masonryColumn}>
-          {products
-            .filter((_, i) => i % 2 === 0)
-            .map((item, i) => {
-              const height = HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length];
-              return renderProductCard(item, height);
-            })}
-        </View>
-
-        <View style={styles.masonryColumn}>
-          <TouchableOpacity
-            style={[styles.tabCard, styles.bookingCard]}
-            onPress={handleBookingPress}
-            activeOpacity={0.92}
-          >
-            {bookingImageUrl && (
-              <>
-                <Image
-                  source={{ uri: bookingImageUrl }}
-                  style={StyleSheet.absoluteFillObject}
-                  resizeMode="cover"
-                />
-                <View style={styles.bookingImageOverlay} />
-              </>
-            )}
-            <View style={styles.bookingCardContent}>
-              <Text style={styles.bookingQuestion}>Got an event?</Text>
-              <Text style={styles.bookingAction}>Book now!</Text>
-            </View>
-          </TouchableOpacity>
-
-          {products
-            .filter((_, i) => i % 2 === 1)
-            .map((item, i) => {
-              const height = HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length];
-              return renderProductCard(item, height);
-            })}
         </View>
       </View>
     );
@@ -348,7 +443,7 @@ export default function CategoryTabs() {
         <View style={styles.centerState}>
           <Ionicons name="fast-food-outline" size={64} color="#cbd5e1" />
           <Text style={styles.emptyTitle}>No items available</Text>
-          <Text style={styles.emptySubtitle}>Check back soon for freshly baked goods!</Text>
+          <Text style={styles.emptySubtitle}>Try adjusting your filters</Text>
         </View>
       );
     }
@@ -373,10 +468,14 @@ export default function CategoryTabs() {
           <View style={styles.quickOrderWrapper}>
             <Quickorder />
           </View>
-          
-          <View style={styles.dessertQuestionContainer}>
-            <Text style={styles.dessertQuestionText}>What's your dessert today? 🍰</Text>
-          </View>
+
+          <ProductFilters
+            onPriceFilterChange={handlePriceFilterChange}
+            selectedPriceRange={selectedPriceRange}
+            onSubcategoryChange={handleSubcategoryChange}
+            subcategories={subcategories}
+            selectedSubcategory={selectedSubcategory}
+          />
         </View>
       }
       ListFooterComponent={
@@ -390,44 +489,27 @@ export default function CategoryTabs() {
   );
 }
 
-
 const styles = StyleSheet.create({
   listContainer: {
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
     paddingBottom: 50,
-    maxWidth: 1200, // Max width for very large screens
-    alignSelf: 'center',
-    width: '100%',
+    width: '100%', // Remove alignSelf and let it stretch
   },
   headerContainer: {
     width: '100%',
-    maxWidth: 1200,
-    alignSelf: 'center',
-  },
-  quickOrderWrapper: {
-    marginBottom: 8,
-    minHeight: 60,
-    width: '100%',
-  },
-  dessertQuestionContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  dessertQuestionText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    textAlign: 'center',
-    letterSpacing: 0.5,
+    // Remove maxWidth and alignSelf
   },
   masonryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 4,
-    maxWidth: 1200,
-    alignSelf: 'center',
+    paddingHorizontal: 0,
+    width: '100%', // Remove alignSelf and let it stretch
+  },
+  quickOrderWrapper: {
+    marginBottom: 8,
+    minHeight: 60,
     width: '100%',
   },
   masonryColumn: {
@@ -437,7 +519,7 @@ const styles = StyleSheet.create({
   tabletGrid: {
     flexDirection: 'row',
     paddingVertical: 4,
-    maxWidth: 1200,
+    paddingHorizontal: 0,
     alignSelf: 'center',
     width: '100%',
   },
@@ -468,6 +550,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+  },
+  bookingCardTablet: {
+    height: 200,
+    backgroundColor: '#6b46c1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    marginBottom: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
   },
   bookingImageOverlay: {
     ...StyleSheet.absoluteFillObject,
