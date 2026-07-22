@@ -105,12 +105,20 @@ const styles = StyleSheet.create({
   wideRoot: {
     flex: 1,
     flexDirection: 'row',
-  },
-  brandingPanel: {
-    flex: 1,
+    backgroundColor: '#ede9fe',
   },
   wideAppColumn: {
     width: APP_COLUMN_WIDTH,
-    flex: 0,
+    height: '100%',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+  },
+  brandingPanel: {
+    flex: 1,
+    backgroundColor: '#ede9fe',
   },
 });
+
