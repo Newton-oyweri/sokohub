@@ -127,7 +127,16 @@ export default function CategoryTabs() {
     }
   };
 
-  const fetchProducts = async (pageToFetch: number, append: boolean) => {
+  // overrideSubcategory / overridePriceRange let callers pass the NEW filter
+  // value directly, avoiding stale-closure reads of state that hasn't
+  // re-rendered yet (setState is async, so reading state right after
+  // setSelected... would grab the old value).
+  const fetchProducts = async (
+    pageToFetch: number,
+    append: boolean,
+    overrideSubcategory: string | null = selectedSubcategory,
+    overridePriceRange: string | null = selectedPriceRange
+  ) => {
     fetchingRef.current = true;
     try {
       if (append) {
@@ -144,8 +153,8 @@ export default function CategoryTabs() {
       }
 
       let targetCategoryIds = categoryIds;
-      if (selectedSubcategory && categoryIds.includes(selectedSubcategory)) {
-        targetCategoryIds = [selectedSubcategory];
+      if (overrideSubcategory && categoryIds.includes(overrideSubcategory)) {
+        targetCategoryIds = [overrideSubcategory];
       }
 
       if (targetCategoryIds.length === 0) {
@@ -165,7 +174,7 @@ export default function CategoryTabs() {
         .eq('is_available', true);
 
       // Apply price filters
-      const priceRange = PRICE_RANGES[selectedPriceRange as keyof typeof PRICE_RANGES];
+      const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
       if (priceRange && priceRange.min !== null) {
         query = query.gte('price', priceRange.min);
       }
@@ -251,19 +260,19 @@ export default function CategoryTabs() {
     }, 500);
   };
 
-  // Filter handlers
+  // Filter handlers — pass the NEW value straight into fetchProducts
   const handlePriceFilterChange = (range: string | null) => {
     setSelectedPriceRange(range);
     setPage(0);
     setHasMore(true);
-    fetchProducts(0, false);
+    fetchProducts(0, false, selectedSubcategory, range);
   };
 
   const handleSubcategoryChange = (categoryId: string | null) => {
     setSelectedSubcategory(categoryId);
     setPage(0);
     setHasMore(true);
-    fetchProducts(0, false);
+    fetchProducts(0, false, categoryId, selectedPriceRange);
   };
 
   const getProductImage = (item: Product) => {
@@ -494,18 +503,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 0,
     paddingBottom: 50,
-    width: '100%', // Remove alignSelf and let it stretch
+    width: '100%',
   },
   headerContainer: {
     width: '100%',
-    // Remove maxWidth and alignSelf
   },
   masonryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 4,
     paddingHorizontal: 0,
-    width: '100%', // Remove alignSelf and let it stretch
+    width: '100%',
   },
   quickOrderWrapper: {
     marginBottom: 8,
