@@ -8,6 +8,8 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,8 +27,15 @@ type Product = {
   post_type?: string;
 };
 
-// Fixed height variants matching your original masonry look
-const HEIGHT_VARIANTS = [280, 220, 250, 200, 260];
+// Dynamic height variants based on screen width
+const getHeightVariants = (width: number) => {
+  const isLargeScreen = width > 600;
+  const isTablet = width > 900;
+  
+  if (isTablet) return [340, 280, 310, 260, 320];
+  if (isLargeScreen) return [300, 240, 270, 220, 290];
+  return [280, 220, 250, 200, 260]; // Default for phones
+};
 
 const PAGE_SIZE = 12;
 
@@ -41,13 +50,33 @@ export default function CategoryTabs() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(2);
 
   const fetchingRef = useRef(false);
   const isNavigating = useRef(false);
 
   useEffect(() => {
     initialLoad();
+
+    // Handle screen dimension changes
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+      updateNumColumns(window.width);
+    });
+
+    return () => subscription?.remove();
   }, []);
+
+  const updateNumColumns = (width: number) => {
+    if (width > 1024) {
+      setNumColumns(4); // Tablet landscape / large screens
+    } else if (width > 768) {
+      setNumColumns(3); // Tablets
+    } else {
+      setNumColumns(2); // Phones
+    }
+  };
 
   const fetchCakeCategoryIds = async (): Promise<string[]> => {
     const { data, error } = await supabase
@@ -171,6 +200,21 @@ export default function CategoryTabs() {
     return undefined;
   };
 
+  const handleProductPress = (item: Product) => {
+    router.push({
+      pathname: '../order',
+      params: {
+        id: item.id,
+        name: item.name,
+        price: typeof item.price === 'number' ? item.price.toString() : item.price,
+        seller_id: item.seller_id || '',
+        description: item.description || 'Delicious treat',
+        image_urls: JSON.stringify(item.image_urls || []),
+        post_type: item.post_type || 'sale',
+      }
+    });
+  };
+
   const renderProductCard = (item: Product, height: number) => {
     const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
     const imageSource = getProductImage(item);
@@ -179,12 +223,7 @@ export default function CategoryTabs() {
       <TouchableOpacity
         key={item.id}
         style={[styles.tabCard, { height }]}
-        onPress={() =>
-          router.push({
-            pathname: '../review',
-            params: { id: item.id, post_type: item.post_type },
-          })
-        }
+        onPress={() => handleProductPress(item)}
         activeOpacity={0.95}
       >
         <Image source={imageSource} style={styles.tabImage} resizeMode="cover" />
@@ -198,8 +237,84 @@ export default function CategoryTabs() {
     );
   };
 
+  // Render products in a responsive grid
+  const renderResponsiveGrid = useCallback(() => {
+    const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
+    const isTablet = screenWidth > 768;
+    
+    // For tablet, use a different layout
+    if (isTablet) {
+      // Split into columns for tablet
+      const columns = numColumns;
+      const columnItems: Product[][] = Array.from({ length: columns }, () => []);
+      
+      products.forEach((item, index) => {
+        const columnIndex = index % columns;
+        columnItems[columnIndex].push(item);
+      });
+
+      return (
+        <View style={[styles.tabletGrid, { gap: 12 }]}>
+          {columnItems.map((column, colIndex) => (
+            <View key={`col-${colIndex}`} style={[styles.tabletColumn, { flex: 1 / columns }]}>
+              {column.map((item, itemIndex) => {
+                const height = HEIGHT_VARIANTS[itemIndex % HEIGHT_VARIANTS.length];
+                return renderProductCard(item, height);
+              })}
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // Phone layout - original masonry
+    return (
+      <View style={styles.masonryContainer}>
+        <View style={styles.masonryColumn}>
+          {products
+            .filter((_, i) => i % 2 === 0)
+            .map((item, i) => {
+              const height = HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length];
+              return renderProductCard(item, height);
+            })}
+        </View>
+
+        <View style={styles.masonryColumn}>
+          <TouchableOpacity
+            style={[styles.tabCard, styles.bookingCard]}
+            onPress={handleBookingPress}
+            activeOpacity={0.92}
+          >
+            {bookingImageUrl && (
+              <>
+                <Image
+                  source={{ uri: bookingImageUrl }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                />
+                <View style={styles.bookingImageOverlay} />
+              </>
+            )}
+            <View style={styles.bookingCardContent}>
+              <Text style={styles.bookingQuestion}>Got an event?</Text>
+              <Text style={styles.bookingAction}>Book now!</Text>
+            </View>
+          </TouchableOpacity>
+
+          {products
+            .filter((_, i) => i % 2 === 1)
+            .map((item, i) => {
+              const height = HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length];
+              return renderProductCard(item, height);
+            })}
+        </View>
+      </View>
+    );
+  }, [products, bookingImageUrl, screenWidth, numColumns]);
+
   const renderContent = useCallback(() => {
     if (loading && !refreshing) {
+      const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
       return (
         <View style={styles.masonryContainer}>
           <View style={styles.masonryColumn}>
@@ -238,52 +353,8 @@ export default function CategoryTabs() {
       );
     }
 
-    return (
-      <View style={styles.masonryContainer}>
-        {/* Left Column: Even-indexed Products */}
-        <View style={styles.masonryColumn}>
-          {products
-            .filter((_, i) => i % 2 === 0)
-            .map((item, i) => {
-              const height = HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length];
-              return renderProductCard(item, height);
-            })}
-        </View>
-
-        {/* Right Column: Event Booking CTA + Odd-indexed Products */}
-        <View style={styles.masonryColumn}>
-          {/* Main Large Booking Block Card directly in original right-column spot */}
-          <TouchableOpacity
-            style={[styles.tabCard, styles.bookingCard]}
-            onPress={handleBookingPress}
-            activeOpacity={0.92}
-          >
-            {bookingImageUrl && (
-              <>
-                <Image
-                  source={{ uri: bookingImageUrl }}
-                  style={StyleSheet.absoluteFillObject}
-                  resizeMode="cover"
-                />
-                <View style={styles.bookingImageOverlay} />
-              </>
-            )}
-            <View style={styles.bookingCardContent}>
-              <Text style={styles.bookingQuestion}>Got an event?</Text>
-              <Text style={styles.bookingAction}>Book now!</Text>
-            </View>
-          </TouchableOpacity>
-
-          {products
-            .filter((_, i) => i % 2 === 1)
-            .map((item, i) => {
-              const height = HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length];
-              return renderProductCard(item, height);
-            })}
-        </View>
-      </View>
-    );
-  }, [products, bookingImageUrl, loading, error, refreshing]);
+    return renderResponsiveGrid();
+  }, [products, bookingImageUrl, loading, error, refreshing, screenWidth, numColumns]);
 
   return (
     <FlatList
@@ -298,9 +369,14 @@ export default function CategoryTabs() {
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6b46c1']} />
       }
       ListHeaderComponent={
-        /* Fixed, stable Quickorder container wrapper prevents layout shifting */
-        <View style={styles.quickOrderWrapper}>
-          <Quickorder />
+        <View style={styles.headerContainer}>
+          <View style={styles.quickOrderWrapper}>
+            <Quickorder />
+          </View>
+          
+          <View style={styles.dessertQuestionContainer}>
+            <Text style={styles.dessertQuestionText}>What's your dessert today? 🍰</Text>
+          </View>
         </View>
       }
       ListFooterComponent={
@@ -314,24 +390,60 @@ export default function CategoryTabs() {
   );
 }
 
+
 const styles = StyleSheet.create({
   listContainer: {
     padding: 8,
     paddingBottom: 50,
+    maxWidth: 1200, // Max width for very large screens
+    alignSelf: 'center',
+    width: '100%',
+  },
+  headerContainer: {
+    width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
   },
   quickOrderWrapper: {
-    marginBottom: 12,
-    minHeight: 60, // Reserves height so component doesn't bounce/dance on render
+    marginBottom: 8,
+    minHeight: 60,
     width: '100%',
+  },
+  dessertQuestionContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    marginBottom: 8,
+    backgroundColor: 'transparent',
+  },
+  dessertQuestionText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   masonryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 4,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
   },
   masonryColumn: {
     width: '48.5%',
     gap: 12,
+  },
+  tabletGrid: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  tabletColumn: {
+    gap: 12,
+    paddingHorizontal: 4,
   },
   skeletonCard: {
     width: '100%',
@@ -348,9 +460,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
+    backgroundColor: '#fff',
   },
   bookingCard: {
-    height: 420, // Maintained original 420 height
+    height: 420,
     backgroundColor: '#6b46c1',
     justifyContent: 'center',
     alignItems: 'center',
@@ -446,4 +559,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
