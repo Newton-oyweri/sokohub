@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Platform } from 'react-native';
 
 // Import central Supabase client via path alias
 import { supabase } from '@/lib/supabase';
@@ -173,7 +174,7 @@ export default function Services({ onSelectService, onSubmitCustomTask, sellerId
         ListFooterComponent={renderFooter}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
-        scrollEnabled={false}
+          scrollEnabled={Platform.OS === 'web' ? true : false}  
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>No active services found in database.</Text>
