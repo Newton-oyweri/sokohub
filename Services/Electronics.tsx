@@ -27,11 +27,14 @@ type Category = {
 
 type Product = {
   id: string;
+  seller_id: string;
   name: string;
+  description: string | null;
   price: number;
   image_urls: string[] | null;
   category: string;
   rating: number;
+  post_type: 'sale' | 'booking' | 'pinned';
 };
 
 function formatKES(amount: number) {
@@ -78,7 +81,7 @@ export default function Electronics() {
 
       let query = supabase
         .from('products')
-        .select('id, name, price, image_urls, category, rating')
+        .select('id, seller_id, name, description, price, image_urls, category, rating, post_type')
         .eq('is_available', true)
         .order('created_at', { ascending: false });
 
@@ -100,7 +103,19 @@ export default function Electronics() {
       const { data, error } = await query;
       if (error) throw error;
 
-      setProducts(data || []);
+      const formattedData: Product[] = (data || []).map((item) => ({
+        id: item.id,
+        seller_id: item.seller_id ?? '',
+        name: item.name,
+        description: item.description ?? null,
+        price: item.price ?? 0,
+        image_urls: item.image_urls ?? null,
+        category: item.category ?? '',
+        rating: item.rating ?? 0,
+        post_type: item.post_type ?? 'sale',
+      }));
+
+      setProducts(formattedData);
     } catch (err: any) {
       console.error('Error fetching electronics products:', err.message);
       setError('Could not load electronics. Please check your connection.');
@@ -118,10 +133,18 @@ export default function Electronics() {
     fetchProducts();
   }, [fetchProducts]);
 
-  const handleProductPress = (productId: string) => {
+  const handleProductPress = (item: Product) => {
     router.push({
-      pathname: '../products/[id]',
-      params: { id: productId },
+      pathname: '../order',
+      params: {
+        id: item.id,
+        name: item.name,
+        price: item.price.toString(),
+        seller_id: item.seller_id,
+        description: item.description || 'Quality product',
+        image_urls: JSON.stringify(item.image_urls),
+        post_type: item.post_type,
+      },
     });
   };
 
@@ -132,7 +155,7 @@ export default function Electronics() {
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.85}
-        onPress={() => handleProductPress(item.id)}
+        onPress={() => handleProductPress(item)}
       >
         <Image
           source={imageUrl ? { uri: imageUrl } : require('@/assets/images/icon.png')}
@@ -256,16 +279,16 @@ export default function Electronics() {
             // scrollEnabled=false: this FlatList no longer owns its own scroll.
             // It just lays out the grid and reports its natural height; the
             // home screen's outer Animated.ScrollView is the single scroller.
-           <FlatList
-  data={products}
-  keyExtractor={(item) => item.id}
-  renderItem={renderProductItem}
-  numColumns={2}
-  scrollEnabled={Platform.OS === 'web' ? true : false}
-  columnWrapperStyle={styles.columnWrapper}
-  contentContainerStyle={styles.listContent}
-  showsVerticalScrollIndicator={true}
-/>
+            <FlatList
+              data={products}
+              keyExtractor={(item) => item.id}
+              renderItem={renderProductItem}
+              numColumns={2}
+              scrollEnabled={Platform.OS === 'web' ? true : false}
+              columnWrapperStyle={styles.columnWrapper}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={true}
+            />
           )}
         </View>
       </View>
@@ -276,7 +299,7 @@ export default function Electronics() {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#F9FAFB',
-  paddingBottom:56,
+    paddingBottom: 56,
   },
   header: {
     paddingHorizontal: 16,
