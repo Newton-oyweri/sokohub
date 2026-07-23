@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet, BackHandler } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet, BackHandler, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import Services from '../../../Services/Services';
 import Fashion from '../../../Services/Fashion';
 import Electronics from '../../../Services/Electronics';
@@ -12,34 +13,45 @@ interface CategoryTabsProps {
 }
 
 const BASE_CATEGORY: CategoryKey = 'bakery';
+const isWeb = Platform.OS === 'web';
 
 export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
-  // Navigation stack keeping track of tab history
+  // --- Native path: local history stack ---
   const [navHistory, setNavHistory] = useState<CategoryKey[]>([BASE_CATEGORY]);
 
-  // Current category is always the last item in our history stack
-  const activeCategory = navHistory[navHistory.length - 1];
+  // --- Web path: URL-driven state ---
+  const router = useRouter();
+  const pathname = usePathname();
+  const { category } = useLocalSearchParams<{ category?: string }>();
 
-  // 1. Handle Forward Selection
+  // Single source of truth depending on platform
+  const activeCategory: CategoryKey = isWeb
+    ? (category as CategoryKey) || BASE_CATEGORY
+    : navHistory[navHistory.length - 1];
+
   const handleSelectCategory = (key: CategoryKey) => {
     if (key === activeCategory) return;
 
-    setNavHistory((prev) => {
-      // Remove instances of the selected key so we don't end up with consecutive duplicates
-      const filtered = prev.filter((cat) => cat !== key);
-      return [...filtered, key];
-    });
+    if (isWeb) {
+      router.push({ pathname, params: { category: key } });
+    } else {
+      setNavHistory((prev) => {
+        const filtered = prev.filter((cat) => cat !== key);
+        return [...filtered, key];
+      });
+    }
   };
 
-  // 2. Intercept Hardware Back Button (Android / Custom Back)
+  // Hardware back button — native only, walks the local history stack
   useEffect(() => {
+    if (isWeb) return;
+
     const onBackPress = () => {
-      // If we have history beyond the base route, step back
       if (navHistory.length > 1) {
         setNavHistory((prev) => prev.slice(0, -1));
-        return true; // Prevent default app exit / back behavior
+        return true;
       }
-      return false; // Let standard back action happen (e.g., leave screen)
+      return false;
     };
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -140,4 +152,3 @@ const styles = StyleSheet.create({
   placeholderTitle: { fontSize: 17, fontWeight: '700', color: '#1f2937', marginBottom: 4 },
   placeholderSubtitle: { fontSize: 14, color: '#9CA3AF' },
 });
-
