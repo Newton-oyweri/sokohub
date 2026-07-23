@@ -256,15 +256,16 @@ export default function Electronics() {
             // scrollEnabled=false: this FlatList no longer owns its own scroll.
             // It just lays out the grid and reports its natural height; the
             // home screen's outer Animated.ScrollView is the single scroller.
-            <FlatList
-              data={products}
-              keyExtractor={(item) => item.id}
-              renderItem={renderProductItem}
-              numColumns={2}
-              scrollEnabled={false}
-              columnWrapperStyle={styles.columnWrapper}
-              contentContainerStyle={styles.listContent}
-            />
+           <FlatList
+  data={products}
+  keyExtractor={(item) => item.id}
+  renderItem={renderProductItem}
+  numColumns={2}
+  scrollEnabled={Platform.OS === 'web' ? true : false}
+  columnWrapperStyle={styles.columnWrapper}
+  contentContainerStyle={styles.listContent}
+  showsVerticalScrollIndicator={true}
+/>
           )}
         </View>
       </View>
