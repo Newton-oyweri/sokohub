@@ -5,9 +5,7 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
-  RefreshControl,
   Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -60,7 +58,6 @@ export default function CategoryTabs() {
   const [products, setProducts] = useState<Product[]>([]);
   const [bookingImageUrl, setBookingImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
@@ -127,10 +124,6 @@ export default function CategoryTabs() {
     }
   };
 
-  // overrideSubcategory / overridePriceRange let callers pass the NEW filter
-  // value directly, avoiding stale-closure reads of state that hasn't
-  // re-rendered yet (setState is async, so reading state right after
-  // setSelected... would grab the old value).
   const fetchProducts = async (
     pageToFetch: number,
     append: boolean,
@@ -166,14 +159,12 @@ export default function CategoryTabs() {
       const from = pageToFetch * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      // Build query with price filter
       let query = supabase
         .from('products')
         .select('*')
         .in('category', targetCategoryIds)
         .eq('is_available', true);
 
-      // Apply price filters
       const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
       if (priceRange && priceRange.min !== null) {
         query = query.gte('price', priceRange.min);
@@ -239,18 +230,6 @@ export default function CategoryTabs() {
     await fetchProducts(0, false);
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    fetchBookingBanner();
-    await fetchProducts(0, false);
-    setRefreshing(false);
-  };
-
-  const handleLoadMore = () => {
-    if (fetchingRef.current || !hasMore || loading) return;
-    fetchProducts(page + 1, true);
-  };
-
   const handleBookingPress = () => {
     if (isNavigating.current) return;
     isNavigating.current = true;
@@ -260,7 +239,6 @@ export default function CategoryTabs() {
     }, 500);
   };
 
-  // Filter handlers — pass the NEW value straight into fetchProducts
   const handlePriceFilterChange = (range: string | null) => {
     setSelectedPriceRange(range);
     setPage(0);
@@ -296,7 +274,7 @@ export default function CategoryTabs() {
         description: item.description || 'Delicious treat',
         image_urls: JSON.stringify(item.image_urls || []),
         post_type: item.post_type || 'sale',
-      }
+      },
     });
   };
 
@@ -416,20 +394,26 @@ export default function CategoryTabs() {
     );
   }, [products, bookingImageUrl, screenWidth, numColumns]);
 
-  const renderContent = useCallback(() => {
-    if (loading && !refreshing) {
+  const renderContent = () => {
+    if (loading) {
       const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
       return (
         <View style={styles.masonryContainer}>
           <View style={styles.masonryColumn}>
             {[0, 2, 4].map((i) => (
-              <View key={`left-skel-${i}`} style={[styles.skeletonCard, { height: HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length] }]} />
+              <View
+                key={`left-skel-${i}`}
+                style={[styles.skeletonCard, { height: HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length] }]}
+              />
             ))}
           </View>
           <View style={styles.masonryColumn}>
             <View style={[styles.skeletonCard, { height: 420 }]} />
             {[0, 2].map((i) => (
-              <View key={`right-skel-${i}`} style={[styles.skeletonCard, { height: HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length] }]} />
+              <View
+                key={`right-skel-${i}`}
+                style={[styles.skeletonCard, { height: HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length] }]}
+              />
             ))}
           </View>
         </View>
@@ -458,43 +442,32 @@ export default function CategoryTabs() {
     }
 
     return renderResponsiveGrid();
-  }, [products, bookingImageUrl, loading, error, refreshing, screenWidth, numColumns]);
+  };
 
   return (
-    <FlatList
-      data={[{ key: 'products-masonry' }]}
-      renderItem={() => renderContent()}
-      keyExtractor={(item) => item.key}
-      contentContainerStyle={styles.listContainer}
-      showsVerticalScrollIndicator={false}
-      onEndReached={handleLoadMore}
-      onEndReachedThreshold={0.4}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6b46c1']} />
-      }
-      ListHeaderComponent={
-        <View style={styles.headerContainer}>
-          <View style={styles.quickOrderWrapper}>
-            <Quickorder />
-          </View>
-
-          <ProductFilters
-            onPriceFilterChange={handlePriceFilterChange}
-            selectedPriceRange={selectedPriceRange}
-            onSubcategoryChange={handleSubcategoryChange}
-            subcategories={subcategories}
-            selectedSubcategory={selectedSubcategory}
-          />
+    <View style={styles.listContainer}>
+      <View style={styles.headerContainer}>
+        <View style={styles.quickOrderWrapper}>
+          <Quickorder />
         </View>
-      }
-      ListFooterComponent={
-        loadingMore ? (
-          <View style={styles.footerLoading}>
-            <ActivityIndicator size="small" color="#6b46c1" />
-          </View>
-        ) : null
-      }
-    />
+
+        <ProductFilters
+          onPriceFilterChange={handlePriceFilterChange}
+          selectedPriceRange={selectedPriceRange}
+          onSubcategoryChange={handleSubcategoryChange}
+          subcategories={subcategories}
+          selectedSubcategory={selectedSubcategory}
+        />
+      </View>
+
+      {renderContent()}
+
+      {loadingMore && (
+        <View style={styles.footerLoading}>
+          <ActivityIndicator size="small" color="#6b46c1" />
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -660,3 +633,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet, BackHandler } from 'react-native';
 import Services from '../../../Services/Services';
 import Fashion from '../../../Services/Fashion';
 import Electronics from '../../../Services/Electronics';
@@ -11,18 +11,40 @@ interface CategoryTabsProps {
   scrollY?: Animated.Value;
 }
 
-function CategoryPlaceholder({ label }: { label: string }) {
-  return (
-    <View style={styles.placeholderWrap}>
-      <Text style={styles.placeholderEmoji}>🚧</Text>
-      <Text style={styles.placeholderTitle}>{label}</Text>
-      <Text style={styles.placeholderSubtitle}>Coming soon</Text>
-    </View>
-  );
-}
+const BASE_CATEGORY: CategoryKey = 'bakery';
 
 export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
-  const [activeCategory, setActiveCategory] = useState<CategoryKey>('bakery');
+  // Navigation stack keeping track of tab history
+  const [navHistory, setNavHistory] = useState<CategoryKey[]>([BASE_CATEGORY]);
+
+  // Current category is always the last item in our history stack
+  const activeCategory = navHistory[navHistory.length - 1];
+
+  // 1. Handle Forward Selection
+  const handleSelectCategory = (key: CategoryKey) => {
+    if (key === activeCategory) return;
+
+    setNavHistory((prev) => {
+      // Remove instances of the selected key so we don't end up with consecutive duplicates
+      const filtered = prev.filter((cat) => cat !== key);
+      return [...filtered, key];
+    });
+  };
+
+  // 2. Intercept Hardware Back Button (Android / Custom Back)
+  useEffect(() => {
+    const onBackPress = () => {
+      // If we have history beyond the base route, step back
+      if (navHistory.length > 1) {
+        setNavHistory((prev) => prev.slice(0, -1));
+        return true; // Prevent default app exit / back behavior
+      }
+      return false; // Let standard back action happen (e.g., leave screen)
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
+  }, [navHistory]);
 
   const categoryOpacity = scrollY
     ? scrollY.interpolate({
@@ -44,7 +66,13 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
         return <Fashion />;
       default: {
         const meta = CATEGORIES.find((c) => c.key === activeCategory);
-        return <CategoryPlaceholder label={meta?.label || 'Category'} />;
+        return (
+          <View style={styles.placeholderWrap}>
+            <Text style={styles.placeholderEmoji}>🚧</Text>
+            <Text style={styles.placeholderTitle}>{meta?.label || 'Category'}</Text>
+            <Text style={styles.placeholderSubtitle}>Coming soon</Text>
+          </View>
+        );
       }
     }
   };
@@ -63,7 +91,7 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
               <TouchableOpacity
                 key={cat.key}
                 style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                onPress={() => setActiveCategory(cat.key)}
+                onPress={() => handleSelectCategory(cat.key)}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
@@ -81,9 +109,7 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   categoryRow: {
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -100,39 +126,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  categoryChipActive: {
-    backgroundColor: '#6b46c1',
-  },
-  categoryLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6b46c1',
-  },
-  categoryLabelActive: {
-    color: '#ffffff',
-  },
-  contentBody: {
-    flex: 1,
-  },
+  categoryChipActive: { backgroundColor: '#6b46c1' },
+  categoryLabel: { fontSize: 13, fontWeight: '600', color: '#6b46c1' },
+  categoryLabelActive: { color: '#ffffff' },
+  contentBody: { flex: 1 },
   placeholderWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 80,
     paddingHorizontal: 24,
   },
-  placeholderEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  placeholderTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  placeholderSubtitle: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
+  placeholderEmoji: { fontSize: 40, marginBottom: 12 },
+  placeholderTitle: { fontSize: 17, fontWeight: '700', color: '#1f2937', marginBottom: 4 },
+  placeholderSubtitle: { fontSize: 14, color: '#9CA3AF' },
 });
 
