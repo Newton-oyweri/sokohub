@@ -9,18 +9,16 @@ import {
   Platform,
   StatusBar,
   Image,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CategoryTabs from './Cakes/CategoryTabs';
 import Account from './Account/Account';
 import Header, { HEADER_HEIGHT } from '../../components/Header';
 import DownloadAction from '../../components/DownloadAction';
-import { useHomeScreen, CATEGORIES } from './useHomeScreen';
+import { useHomeScreen } from './useHomeScreen';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
-// Detects whether the app is running installed as a PWA (web only).
 function useIsPWA() {
   const [isPWA, setIsPWA] = useState(false);
 
@@ -44,8 +42,6 @@ export default function App() {
     activeTab,
     handleShopPress,
     handleAccountPress,
-    activeCategory,
-    handleCategoryPress,
     isLoggedIn,
     userName,
     avatarUrl,
@@ -54,13 +50,6 @@ export default function App() {
     greetingOpacity,
     scrollY,
   } = useHomeScreen();
-
-  // Create an animated opacity for the category row based on scroll
-  const categoryOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_HEIGHT - 60],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
 
   const isPWA = useIsPWA();
 
@@ -133,39 +122,11 @@ export default function App() {
           </View>
 
           <View style={styles.contentCard}>
-            {activeTab === 'cakes' && (
-              <Animated.View style={{ opacity: categoryOpacity }}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoryRow}
-                >
-                  {CATEGORIES.map((cat) => {
-                    const isActive = activeCategory === cat.key;
-                    return (
-                      <TouchableOpacity
-                        key={cat.key}
-                        style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                        onPress={() => handleCategoryPress(cat.key)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
-                          {cat.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </Animated.View>
+            {activeTab === 'cakes' ? (
+              <CategoryTabs scrollY={scrollY} />
+            ) : (
+              <Account />
             )}
-
-            <View style={styles.contentBody}>
-              {activeTab === 'cakes' ? (
-                <CategoryTabs activeCategory={activeCategory} />
-              ) : (
-                <Account />
-              )}
-            </View>
           </View>
         </Animated.ScrollView>
 
@@ -271,40 +232,9 @@ const styles = StyleSheet.create({
     borderColor: '#6b46c1',
     borderWidth: 1.5,
   },
-  categoryRow: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 8,
-    gap: 10,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  categoryChipActive: {
-    backgroundColor: '#6b46c1',
-  },
-  categoryLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6b46c1',
-  },
-  categoryLabelActive: {
-    color: '#ffffff',
-  },
   contentCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-  },
-  contentBody: {
-    flex: 1,
   },
   fixedNotifIconContainer: {
     position: 'absolute',
