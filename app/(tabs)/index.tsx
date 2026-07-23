@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import React, { useState, useEffect } from 'react';
+import { router } from 'expo-router';
 import {
   View,
   Text,
@@ -9,333 +9,238 @@ import {
   Platform,
   StatusBar,
   Image,
-  BackHandler,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CakeCarousel from './Cakes/CakeCarousel';
 import Account from './Account/Account';
 import Header, { HEADER_HEIGHT } from '../../components/Header';
 import DownloadAction from '../../components/DownloadAction';
-import { supabase } from '../../lib/supabase';
+import Services from './../../Services/Services';
+import Fashion from './../../Services/Fashion';
+import Electronics from './../../Services/Electronics';
+import { useHomeScreen, CATEGORIES, CategoryKey } from './useHomeScreen';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
+
+// Detects whether the app is running installed as a PWA (web only).
+// Native apps (iOS/Android) never match this, so we bail out early
+// via Platform.OS check — window.matchMedia doesn't exist on native.
+function useIsPWA() {
+  const [isPWA, setIsPWA] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return; // native app is never "PWA"
+
+    const standalone =
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches) ||
+      // @ts-ignore - iOS Safari specific
+      window.navigator.standalone === true;
+
+    setIsPWA(standalone);
+  }, []);
+
+  return isPWA;
+}
+
+// Simple mock placeholder shown for every category that doesn't have
+// real content yet. Swap these out for real components as each
+// category gets built.
+function CategoryPlaceholder({ label }: { label: string }) {
+  return (
+    <View style={styles.placeholderWrap}>
+      <Text style={styles.placeholderEmoji}>🚧</Text>
+      <Text style={styles.placeholderTitle}>{label}</Text>
+      <Text style={styles.placeholderSubtitle}>Coming soon</Text>
+    </View>
+  );
+}
+
+// Renders whichever category is active. Bakery is the only category
+// with a real component (CakeCarousel); everything else is a mock
+// placeholder until that category is built out.
+function CategoryContent({ category }: { category: CategoryKey }) {
+  if (category === 'bakery') {
+    return (
+      <>
+        <CakeCarousel />
+      </>
+    );
+  }
+    if (category === 'services') {
+    return <Services />;
+  }
+  if (category === 'electronics') {
+    return <Electronics />;
+  }
+
+  if (category === 'fashion') {
+    return <Fashion />;
+  }
+
+  const meta = CATEGORIES.find((c) => c.key === category)!;
+  return <CategoryPlaceholder label={meta.label} />;
+}
 
 // This is now the ONLY route for this screen. Do not create a second
 // route file for Account — it is a tab of this shell, not a destination.
 export default function App() {
-  // Supports deep-linking straight to a tab, e.g. router.push("/(tabs)?tab=account")
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeTab, setActiveTab] = useState<'cakes' | 'account'>(
-    tab === 'account' ? 'account' : 'cakes'
-  );
+  const {
+    activeTab,
+    handleShopPress,
+    handleAccountPress,
+    activeCategory,
+    handleCategoryPress,
+    isLoggedIn,
+    userName,
+    avatarUrl,
+    unreadCount,
+    bellRotation,
+    greetingOpacity,
+    scrollY,
+  } = useHomeScreen();
 
-  // Auth & Profile states
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName] = useState('Guest User');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  // Notifications State & Animation Refs
-  const [unreadCount, setUnreadCount] = useState(0);
-  const shakeAnimation = useRef(new Animated.Value(0)).current;
-  const shakeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Animated value tracker for scroll management
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  // Simple tab switch — no navigation, no stack push, just local state.
-  const handleAccountPress = () => {
-    setActiveTab('account');
-  };
-
-  const handleShopPress = () => {
-    setActiveTab('cakes');
-  };
-
-  // --- SMART HARDWARE BACK BUTTON ---
-  // On Account tab: back returns to Shop instead of leaving the screen/app.
-  // On Shop tab: back falls through to default behavior (exit app / pop stack).
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = () => {
-        if (activeTab === 'account') {
-          setActiveTab('cakes');
-          return true; // handled — block default back behavior
-        }
-        return false; // let the OS/navigator do its default thing
-      };
-
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => subscription.remove();
-    }, [activeTab])
-  );
-
-  // --- CORE AUTH LIFECYCLE ---
-  useEffect(() => {
-    checkUserSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        setIsLoggedIn(true);
-        fetchProfileDetails(session.user.id);
-        fetchUnreadCount(session.user.id);
-      } else {
-        setIsLoggedIn(false);
-        setUserName('Guest User');
-        setAvatarUrl(null);
-        setUnreadCount(0);
-      }
-    });
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
-
-  const checkUserSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      setIsLoggedIn(true);
-      fetchProfileDetails(session.user.id);
-      fetchUnreadCount(session.user.id);
-    }
-  };
-
-  const fetchProfileDetails = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url')
-        .eq('id', userId)
-        .single();
-
-      if (data) {
-        setUserName(data.full_name?.trim() || 'New User');
-        setAvatarUrl(data.avatar_url || null);
-      }
-    } catch (err) {
-      console.log('Error fetching greeting assets:', err);
-    }
-  };
-
-  // --- NOTIFICATION LIFECYCLE MANAGEMENT ---
-  const fetchUnreadCount = async (userId: string) => {
-    try {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
-
-      if (!error && count !== null) {
-        setUnreadCount(count);
-      }
-    } catch (err) {
-      console.log('Error fetching unread count:', err);
-    }
-  };
-
-  useEffect(() => {
-    let channel: any = null;
-
-    const setupRealtime = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-
-      const userId = session.user.id;
-
-      channel = supabase
-        .channel(`realtime-unread-${userId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${userId}`,
-          },
-          () => {
-            fetchUnreadCount(userId);
-          }
-        );
-
-      channel.subscribe();
-    };
-
-    if (isLoggedIn) {
-      setupRealtime();
-    }
-
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, [isLoggedIn]);
-
-  useEffect(() => {
-    if (shakeIntervalRef.current) {
-      clearInterval(shakeIntervalRef.current);
-      shakeIntervalRef.current = null;
-    }
-
-    if (unreadCount > 0) {
-      triggerBellShake();
-
-      shakeIntervalRef.current = setInterval(() => {
-        triggerBellShake();
-      }, 4000);
-    } else {
-      shakeAnimation.setValue(0);
-    }
-
-    return () => {
-      if (shakeIntervalRef.current) {
-        clearInterval(shakeIntervalRef.current);
-      }
-    };
-  }, [unreadCount]);
-
-  const triggerBellShake = () => {
-    shakeAnimation.setValue(0);
-    Animated.sequence([
-      Animated.timing(shakeAnimation, { toValue: 1, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: -1, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 1, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: -1, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 0.6, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: -0.6, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 0, duration: 45, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const bellRotation = shakeAnimation.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-15deg', '15deg'],
-  });
-
-  const greetingOpacity = scrollY.interpolate({
-    inputRange: [0, 80],
+  // Create an animated opacity for the category row based on scroll
+  const categoryOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT - 60],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
+  const isPWA = useIsPWA();
+
   return (
-    <> 
-      <DownloadAction/>
-    <View style={styles.container}>
-      
+    <>
+      {Platform.OS === 'web' && !isPWA && <DownloadAction />}
+      <View style={styles.container}>
+        <View style={[styles.headerBackground, { paddingTop: STATUS_BAR_HEIGHT }]}>
+          <Header />
+        </View>
 
-      {/* Background Header */}
-      <View style={[styles.headerBackground, { paddingTop: STATUS_BAR_HEIGHT }]}>
-        <Header />
-      </View>
-
-      {/* Main Scrollable Content */}
-      <Animated.ScrollView
-        style={StyleSheet.absoluteFillObject}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: STATUS_BAR_HEIGHT }]}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}
-      >
-        {/* Dynamic Fading Greeting Row */}
-        <Animated.View
-          style={[
-            styles.greetingSpacer,
-            { height: HEADER_HEIGHT - 60, opacity: greetingOpacity }
-          ]}
+        <Animated.ScrollView
+          style={StyleSheet.absoluteFillObject}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: STATUS_BAR_HEIGHT }]}
+          showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
         >
-          <Text style={styles.welcomeText}>
-            Welcome, <Text style={styles.highlightText}>{userName}</Text> 👋
-          </Text>
-        </Animated.View>
+          <Animated.View
+            style={[styles.greetingSpacer, { height: HEADER_HEIGHT - 60, opacity: greetingOpacity }]}
+          >
+            <Text style={styles.welcomeText}>
+              Welcome, <Text style={styles.highlightText}>{userName}</Text> 👋
+            </Text>
+          </Animated.View>
 
-        {/* Premium Sticky Tabs */}
-        <View style={styles.stickyTabsWrapper}>
-          <View style={styles.tabsContainer}>
-
-            {/* Shop Tab */}
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'cakes' && styles.activeTabButton]}
-              onPress={handleShopPress}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={activeTab === 'cakes' ? "storefront" : "storefront-outline"}
-                size={20}
-                color={activeTab === 'cakes' ? '#6b46c1' : '#9CA3AF'}
-              />
-              <Text style={[styles.tabText, activeTab === 'cakes' && styles.activeTabText]}>
-                Shop
-              </Text>
-            </TouchableOpacity>
-
-            {/* Account Tab */}
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'account' && styles.activeTabButton]}
-              onPress={handleAccountPress}
-              activeOpacity={0.8}
-            >
-              {isLoggedIn && avatarUrl ? (
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={[
-                    styles.tabAvatar,
-                    activeTab === 'account' && styles.activeTabAvatar
-                  ]}
-                />
-              ) : (
+          <View style={styles.stickyTabsWrapper}>
+            <View style={styles.tabsContainer}>
+              <TouchableOpacity
+                style={[styles.tabButton, activeTab === 'cakes' && styles.activeTabButton]}
+                onPress={handleShopPress}
+                activeOpacity={0.8}
+              >
                 <Ionicons
-                  name={activeTab === 'account' ? "person" : "person-outline"}
+                  name={activeTab === 'cakes' ? 'storefront' : 'storefront-outline'}
                   size={20}
-                  color={activeTab === 'account' ? "#6b46c1" : "#9CA3AF"}
+                  color={activeTab === 'cakes' ? '#6b46c1' : '#9CA3AF'}
                 />
+                <Text style={[styles.tabText, activeTab === 'cakes' && styles.activeTabText]}>
+                  Shop
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tabButton, activeTab === 'account' && styles.activeTabButton]}
+                onPress={handleAccountPress}
+                activeOpacity={0.8}
+              >
+                {isLoggedIn && avatarUrl ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={[styles.tabAvatar, activeTab === 'account' && styles.activeTabAvatar]}
+                  />
+                ) : (
+                  <Ionicons
+                    name={activeTab === 'account' ? 'person' : 'person-outline'}
+                    size={20}
+                    color={activeTab === 'account' ? '#6b46c1' : '#9CA3AF'}
+                  />
+                )}
+                <Text style={[styles.tabText, activeTab === 'account' && styles.activeTabText]}>
+                  Account
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.contentCard}>
+            {/* Category row - now inside contentCard, below tabs */}
+            {activeTab === 'cakes' && (
+              <Animated.View style={{ opacity: categoryOpacity }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryRow}
+                >
+                  {CATEGORIES.map((cat) => {
+                    const isActive = activeCategory === cat.key;
+                    return (
+                      <TouchableOpacity
+                        key={cat.key}
+                        style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                        onPress={() => handleCategoryPress(cat.key)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </Animated.View>
+            )}
+
+            <View style={styles.contentBody}>
+              {activeTab === 'cakes' ? (
+                <CategoryContent category={activeCategory} />
+              ) : (
+                <Account />
               )}
-              <Text style={[styles.tabText, activeTab === 'account' && styles.activeTabText]}>
-                Account
-              </Text>
-            </TouchableOpacity>
-
+            </View>
           </View>
-        </View>
+        </Animated.ScrollView>
 
-        {/* Content Card Panel */}
-        <View style={styles.contentCard}>
-          <View style={styles.contentBody}>
-            {activeTab === 'cakes' ? <CakeCarousel /> : <Account />}
-          </View>
-        </View>
-      </Animated.ScrollView>
-
-      {/* Upgraded Animated Notification Bell Container */}
-      <TouchableOpacity
-        style={[styles.fixedNotifIconContainer, { top: STATUS_BAR_HEIGHT + 12 }]}
-        activeOpacity={0.7}
-        onPress={() => router.push("/notifications")}
-      >
-        <Animated.View style={{ transform: [{ rotate: bellRotation }] }}>
-          <Ionicons
-            name={unreadCount > 0 ? "notifications" : "notifications-outline"}
-            size={24}
-            color={unreadCount > 0 ? "#6b46c1" : "#1F2937"}
-          />
-        </Animated.View>
-
-        {unreadCount > 0 && <View style={styles.badgeIndicator} />}
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity
+          style={[styles.fixedNotifIconContainer, { top: STATUS_BAR_HEIGHT + 12 }]}
+          activeOpacity={0.7}
+          onPress={() => router.push('/notifications')}
+        >
+          <Animated.View style={{ transform: [{ rotate: bellRotation }] }}>
+            <Ionicons
+              name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
+              size={24}
+              color={unreadCount > 0 ? '#6b46c1' : '#1F2937'}
+            />
+          </Animated.View>
+          {unreadCount > 0 && <View style={styles.badgeIndicator} />}
+        </TouchableOpacity>
+      </View>
     </>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F4FF',
+    
   },
   headerBackground: {
     position: 'absolute',
@@ -366,7 +271,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingTop: 30, 
+    paddingTop: 30,
     paddingBottom: 12,
     shadowColor: '#6b46c1',
     shadowOffset: { width: 0, height: -4 },
@@ -380,7 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 20,
-    marginTop: 4, 
+    marginTop: 4,
   },
   tabButton: {
     flexDirection: 'row',
@@ -415,12 +320,71 @@ const styles = StyleSheet.create({
     borderColor: '#6b46c1',
     borderWidth: 1.5,
   },
+  categoryRow: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 8,
+    gap: 10,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  categoryChipActive: {
+    backgroundColor: '#6b46c1',
+  },
+  categoryIcon: {
+    fontSize: 15,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b46c1',
+  },
+  categoryLabelActive: {
+    color: '#ffffff',
+  },
   contentCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
   contentBody: {
     flex: 1,
+  },
+  bakeryPrompt: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  placeholderWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 24,
+  },
+  placeholderEmoji: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  placeholderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  placeholderSubtitle: {
+    fontSize: 14,
+    color: '#9CA3AF',
   },
   fixedNotifIconContainer: {
     position: 'absolute',
@@ -431,7 +395,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 99, 
+    zIndex: 99,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,

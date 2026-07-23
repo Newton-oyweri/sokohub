@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   SafeAreaView,
   ActivityIndicator,
   Alert,
@@ -13,26 +12,28 @@ import {
   Modal,
   Image,
   FlatList,
+  Animated, // <--- Imported Animated
 } from 'react-native';
 
-import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { supabase } from '../../lib/supabase';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import WeddingCakesContent from '../../components/WeddingCakesContent'; // Import the product list
+import { supabase } from '../../lib/supabase';
+import WeddingCakesContent from '../../components/WeddingCakesContent';
+import BookingFormInputs from './BookingFormInputs';
 
 export default function BookWeddingCake() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+
   // Get product data from navigation params
   const productId = params.id as string;
-  const productName = params.name as string || 'Wedding Cake';
+  const productName = (params.name as string) || 'Wedding Cake';
   const productPrice = parseFloat(params.price as string) || 0;
   const sellerId = params.seller_id as string;
-  const imageUrls = params.image_urls ? JSON.parse(params.image_urls as string) : [];
+  const imageUrls = params.image_urls
+    ? JSON.parse(params.image_urls as string)
+    : [];
 
   const [guests, setGuests] = useState('');
   const [duration, setDuration] = useState('This Month');
@@ -42,66 +43,65 @@ export default function BookWeddingCake() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+const [pendingGuestCount, setPendingGuestCount] = useState<number | null>(null);
+
+  // --- In-App Notification State ---
+  const [notification, setNotification] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
   // Date picker states
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
 
-  const options = [
-    'Tomorrow',
-    'This Week',
-    'This Month',
-    'Choose Date',
-  ];
+  const options = ['Tomorrow', 'This Week', 'This Month', 'Choose Date'];
 
-  useEffect(() => {
-    fetchUserData();
+  const fetchUserData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        setUser(null);
+        setProfile(null);
+        return;
+      }
+
+      setUser(user);
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, phone, avatar_url')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-
-// ...inside your component, replace fetchUserData with the useCallback version:
-
-const fetchUserData = useCallback(async () => {
-  try {
-    setLoading(true);
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      setUser(null);
-      setProfile(null);
-      return;
-    }
-
-    setUser(user);
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('full_name, phone, avatar_url')
-      .eq('id', user.id)
-      .single();
-
-    if (error) throw error;
-    setProfile(data);
-
-  } catch (error: any) {
-    Alert.alert('Error', error.message || 'Failed to load profile');
-  } finally {
-    setLoading(false);
-  }
-}, []);
-
-// Replace your old `useEffect(() => { fetchUserData(); }, [])` with this:
-useFocusEffect(
-  useCallback(() => {
-    fetchUserData();
-
-    return () => {
-      // runs when leaving the screen — add cleanup here if you need it later
-    };
-  }, [fetchUserData])
-);;
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+      return () => {};
+    }, [fetchUserData])
+  );
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'ios') {
@@ -142,39 +142,59 @@ useFocusEffect(
     }
   };
 
-const handleBooking = async () => {
-  // If not logged in, redirect to auth
-  if (!user) {
-    router.push('/auth');
-    return;
-  }
+  // Helper to trigger notification banner with timeout
+  const showInAppNotification = (message: string, type: 'success' | 'error' = 'success', timeoutMs = 4000) => {
+    setNotification({ visible: true, message, type });
+    setTimeout(() => {
+      setNotification((prev) => ({ ...prev, visible: false }));
+    }, timeoutMs);
+  };
 
-  try {
-    // Validate guests
-    const guestCount = parseInt(guests);
-    if (!guests || isNaN(guestCount) || guestCount < 1) {
-      Alert.alert('Invalid Input', 'Please enter a valid number of guests');
+  // Helper to reset inputs and refresh data
+  const resetFormAndRefresh = () => {
+    setGuests('');
+    setNotes('');
+    setDuration('This Month');
+    setSelectedDate(new Date());
+    setActiveImageIndex(0);
+    fetchUserData(); // Re-fetches user/profile info
+  };
+
+const handleBooking = () => {
+    if (!user) {
+      router.push('/auth');
       return;
     }
 
-    setSubmitting(true);
+    const guestCount = parseInt(guests);
+    if (!guests || isNaN(guestCount) || guestCount < 1) {
+      showInAppNotification('Please enter a valid number of guests', 'error');
+      return;
+    }
 
-    // Combine all booking details including contact info into notes
-    const bookingNotes = `
-      Customer Email: ${user.email}
-      Customer Phone: ${profile?.phone || 'Not provided'}
-      Customer Name: ${profile?.full_name || 'Not provided'}
-      ---
-      Booking Details:
-      Guests: ${guests}
-      Needed by: ${duration}
-      Special Requests: ${notes || 'None'}
-    `.trim();
+    setPendingGuestCount(guestCount);
+    setShowConfirmModal(true);
+  };
 
-    // Create order in database
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert({
+  const submitBooking = async () => {
+    if (pendingGuestCount === null) return;
+    setShowConfirmModal(false);
+
+    try {
+      setSubmitting(true);
+
+      const bookingNotes = `
+        Customer Email: ${user.email}
+        Customer Phone: ${profile?.phone || 'Not provided'}
+        Customer Name: ${profile?.full_name || 'Not provided'}
+        ---
+        Booking Details:
+        Guests: ${pendingGuestCount}
+        Needed by: ${duration}
+        Special Requests: ${notes || 'None'}
+      `.trim();
+
+      const { error: orderError } = await supabase.from('orders').insert({
         customer_id: user.id,
         product_id: productId,
         seller_id: sellerId,
@@ -183,20 +203,17 @@ const handleBooking = async () => {
         order_type: 'booking',
       });
 
-    if (orderError) throw orderError;
+      if (orderError) throw orderError;
 
-    Alert.alert(
-      'Booking Submitted!',
-      'Your booking has been submitted successfully. We will contact you shortly.',
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
-
-  } catch (error: any) {
-    Alert.alert('Booking Failed', error.message || 'Please try again');
-  } finally {
-    setSubmitting(false);
-  }
-};
+      showInAppNotification('Booking submitted successfully! We will contact you shortly.', 'success', 4000);
+      resetFormAndRefresh();
+    } catch (error: any) {
+      showInAppNotification(error.message || 'Booking failed. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
+      setPendingGuestCount(null);
+    }
+  };
 
   const renderImageItem = ({ item, index }: { item: string; index: number }) => (
     <TouchableOpacity
@@ -222,7 +239,6 @@ const handleBooking = async () => {
     );
   }
 
-  // If no product selected (coming from main page), show the product list
   if (!productId) {
     return (
       <SafeAreaView style={styles.container}>
@@ -231,9 +247,53 @@ const handleBooking = async () => {
     );
   }
 
-  // Booking form with product details
   return (
     <SafeAreaView style={styles.container}>
+      {/* Floating In-App Notification Banner */}
+      {notification.visible && (
+        <View
+          style={[
+            styles.notificationBanner,
+            notification.type === 'error' ? styles.notificationError : styles.notificationSuccess,
+          ]}
+        >
+          <Ionicons
+            name={notification.type === 'error' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+            size={24}
+            color="#fff"
+          />
+          <Text style={styles.notificationText}>{notification.message}</Text>
+        </View>
+      )}
+<Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.ConfirmmodalOverlay}>
+          <View style={styles.confirmModalCard}>
+            <Text style={styles.confirmModalTitle}>Confirm Booking</Text>
+            <Text style={styles.confirmModalMessage}>
+              Book {productName} for {pendingGuestCount} guest{pendingGuestCount !== 1 ? 's' : ''}, needed by {duration}?
+            </Text>
+            <View style={styles.confirmModalActions}>
+              <TouchableOpacity
+                style={[styles.confirmModalButton, styles.confirmModalCancel]}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalButton, styles.confirmModalConfirm]}
+                onPress={submitBooking}
+              >
+                <Text style={styles.confirmModalConfirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -246,7 +306,6 @@ const handleBooking = async () => {
 
         {/* Cake with Images */}
         <View style={styles.card}>
-          {/* Main Image */}
           {imageUrls.length > 0 && (
             <View style={styles.mainImageContainer}>
               <Image
@@ -264,7 +323,6 @@ const handleBooking = async () => {
             </View>
           )}
 
-          {/* Thumbnail Images */}
           {imageUrls.length > 1 && (
             <View style={styles.thumbnailContainer}>
               <FlatList
@@ -286,72 +344,26 @@ const handleBooking = async () => {
           </View>
         </View>
 
-        {/* Guests */}
-        <Text style={styles.sectionTitle}>
-          Number of Guests
-        </Text>
-
-        <TextInput
-          value={guests}
-          onChangeText={setGuests}
-          keyboardType="numeric"
-          placeholder="e.g. 250"
-          style={styles.input}
-        />
-
-        {/* Duration */}
-        <Text style={styles.sectionTitle}>
-          When do you need it?
-        </Text>
-
-        <View style={styles.options}>
-          {options.map((item) => (
-            <TouchableOpacity
-              key={item}
-              onPress={() => handleOptionPress(item)}
-              style={[
-                styles.option,
-                duration === item && styles.optionActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.optionText,
-                  duration === item &&
-                    styles.optionTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Notes */}
-        <Text style={styles.sectionTitle}>
-          Questions or Special Requests
-        </Text>
-
-        <TextInput
-          multiline
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Tell us about your wedding theme, colours, flavours, delivery location or ask us any question..."
-          style={styles.notes}
-          textAlignVertical="top"
+        {/* Separated Booking Form Inputs */}
+        <BookingFormInputs
+          guests={guests}
+          setGuests={setGuests}
+          duration={duration}
+          options={options}
+          handleOptionPress={handleOptionPress}
+          notes={notes}
+          setNotes={setNotes}
         />
 
         {/* User Details */}
-        <Text style={styles.sectionTitle}>
-          My contact
-        </Text>
+        <Text style={styles.sectionTitle}>My contact</Text>
 
         {!user ? (
           <View style={styles.card}>
             <View style={styles.loginPrompt}>
               <Ionicons name="person-outline" size={32} color="#94a3b8" />
               <Text style={styles.loginPromptText}>You are not logged in</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.loginButton}
                 onPress={() => router.push('/auth')}
               >
@@ -367,11 +379,13 @@ const handleBooking = async () => {
                 <Text style={styles.userDetailLabel}>Email</Text>
                 <Text style={styles.userDetailValue}>{user.email}</Text>
               </View>
-              
+
               <View style={styles.userDetailRow}>
                 <Ionicons name="call-outline" size={20} color="#6b46c1" />
                 <Text style={styles.userDetailLabel}>Phone</Text>
-                <Text style={styles.userDetailValue}>{profile?.phone || 'Not set'}</Text>
+                <Text style={styles.userDetailValue}>
+                  {profile?.phone || 'Not set'}
+                </Text>
               </View>
 
               {profile?.full_name && (
@@ -387,45 +401,26 @@ const handleBooking = async () => {
 
         {/* Summary */}
         <View style={styles.summary}>
-          <Text style={styles.summaryTitle}>
-            Booking Summary
-          </Text>
+          <Text style={styles.summaryTitle}>Booking Summary</Text>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>
-              Cake
-            </Text>
-
-            <Text style={styles.summaryValue}>
-              {productName}
-            </Text>
+            <Text style={styles.summaryLabel}>Cake</Text>
+            <Text style={styles.summaryValue}>{productName}</Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>
-              Guests
-            </Text>
-
-            <Text style={styles.summaryValue}>
-              {guests || '--'}
-            </Text>
+            <Text style={styles.summaryLabel}>Guests</Text>
+            <Text style={styles.summaryValue}>{guests || '--'}</Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>
-              Needed
-            </Text>
-
-            <Text style={styles.summaryValue}>
-              {duration}
-            </Text>
+            <Text style={styles.summaryLabel}>Needed</Text>
+            <Text style={styles.summaryValue}>{duration}</Text>
           </View>
 
           <View style={styles.summaryDivider} />
 
-          <Text style={styles.priceTitle}>
-            Starting Price
-          </Text>
+          <Text style={styles.priceTitle}>Starting Price</Text>
 
           <Text style={styles.bigPrice}>
             KSh {productPrice.toLocaleString()}+
@@ -447,9 +442,8 @@ const handleBooking = async () => {
         </TouchableOpacity>
 
         <Text style={styles.footer}>
-          After booking, our team will contact you to
-          discuss the final design, quotation and
-          delivery arrangements.
+          After booking, our team will contact you to discuss the final design,
+          quotation and delivery arrangements.
         </Text>
       </ScrollView>
 
@@ -505,23 +499,50 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-
+  // In-app Notification Styles
+  notificationBanner: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 20,
+    right: 20,
+    zIndex: 9999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  notificationSuccess: {
+    backgroundColor: '#10b981',
+  },
+  notificationError: {
+    backgroundColor: '#ef4444',
+  },
+  notificationText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 10,
+    flex: 1,
+  },
   center: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   content: {
     padding: 20,
     paddingBottom: 90,
   },
-
   title: {
     fontSize: 30,
     fontWeight: '800',
     color: '#111827',
   },
-
   subtitle: {
     marginTop: 8,
     color: '#64748b',
@@ -529,7 +550,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 25,
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -537,7 +557,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 18,
   },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -548,7 +567,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
   },
-
   mainImageContainer: {
     width: '100%',
     height: 250,
@@ -557,12 +575,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     position: 'relative',
   },
-
   mainImage: {
     width: '100%',
     height: '100%',
   },
-
   imageCounter: {
     position: 'absolute',
     bottom: 12,
@@ -572,21 +588,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
   },
-
   imageCounterText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
   },
-
   thumbnailContainer: {
     marginBottom: 12,
   },
-
   thumbnailList: {
     gap: 8,
   },
-
   imageDot: {
     width: 60,
     height: 60,
@@ -596,132 +608,69 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     overflow: 'hidden',
   },
-
   imageDotActive: {
     borderColor: PRIMARY,
   },
-
   thumbnailImage: {
     width: '100%',
     height: '100%',
   },
-
   productInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
   productName: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
     flex: 1,
   },
-
   productPrice: {
     fontSize: 18,
     fontWeight: '800',
     color: PRIMARY,
   },
-
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    fontSize: 17,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-
-  options: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-
-  option: {
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderRadius: 30,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-
-  optionActive: {
-    backgroundColor: PRIMARY,
-    borderColor: PRIMARY,
-  },
-
-  optionText: {
-    color: '#374151',
-    fontWeight: '600',
-  },
-
-  optionTextActive: {
-    color: '#fff',
-  },
-
-  notes: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    minHeight: 130,
-    padding: 16,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-
   summary: {
     marginTop: 28,
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
   },
-
   summaryTitle: {
     fontSize: 20,
     fontWeight: '800',
     marginBottom: 18,
     color: '#111827',
   },
-
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-
   summaryLabel: {
     color: '#64748b',
     fontSize: 15,
   },
-
   summaryValue: {
     fontWeight: '700',
     color: '#111827',
   },
-
   summaryDivider: {
     height: 1,
     backgroundColor: '#ececec',
     marginVertical: 16,
   },
-
   priceTitle: {
     color: '#64748b',
     fontSize: 14,
   },
-
   bigPrice: {
     marginTop: 6,
     color: PRIMARY,
     fontWeight: '800',
     fontSize: 30,
   },
-
   button: {
     marginTop: 28,
     backgroundColor: PRIMARY,
@@ -729,17 +678,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
   },
-
   buttonDisabled: {
     opacity: 0.7,
   },
-
   buttonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '800',
   },
-
   footer: {
     marginTop: 18,
     textAlign: 'center',
@@ -747,11 +693,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontSize: 14,
   },
-
   userDetails: {
     width: '100%',
   },
-
   userDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -759,14 +703,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-
   userDetailLabel: {
     fontSize: 14,
     color: '#64748b',
     marginLeft: 12,
     flex: 1,
   },
-
   userDetailValue: {
     fontSize: 14,
     fontWeight: '600',
@@ -774,45 +716,38 @@ const styles = StyleSheet.create({
     flex: 2,
     textAlign: 'right',
   },
-
   loginPrompt: {
     alignItems: 'center',
     paddingVertical: 8,
   },
-
   loginPromptText: {
     fontSize: 16,
     color: '#64748b',
     marginTop: 8,
     marginBottom: 16,
   },
-
   loginButton: {
     backgroundColor: PRIMARY,
     paddingVertical: 12,
     paddingHorizontal: 32,
     borderRadius: 12,
   },
-
   loginButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },
-
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 20,
   },
-
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -822,26 +757,74 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-
   modalTitle: {
     fontSize: 17,
     fontWeight: '600',
     color: '#1f2937',
   },
-
   modalCancelText: {
     fontSize: 16,
     color: '#64748b',
     fontWeight: '500',
   },
-
   modalDoneText: {
     fontSize: 16,
     color: PRIMARY,
     fontWeight: '600',
   },
-
   datePicker: {
     height: 200,
+  }
+   ,
+  ConfirmmodalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  } ,
+  confirmModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#1e293b',
+  },
+  confirmModalMessage: {
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  confirmModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  confirmModalCancel: {
+    backgroundColor: '#f1f5f9',
+  },
+  confirmModalConfirm: {
+    backgroundColor: '#6b46c1',
+  },
+  confirmModalCancelText: {
+    color: '#475569',
+    fontWeight: '600',
+  },
+  confirmModalConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
+

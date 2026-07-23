@@ -8,9 +8,14 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
-const { height } = Dimensions.get('window');
+// Fallback value for anything importing HEADER_HEIGHT at module scope
+// (e.g. index.tsx uses it for layout before Header itself mounts).
+// This won't be perfectly accurate in SSR/static export, but avoids
+// a 0-height header and matches native/client behavior once hydrated.
+const { height: initialHeight } = Dimensions.get('window');
 
 const STATUS_BAR_HEIGHT =
   Platform.OS === 'ios'
@@ -18,7 +23,7 @@ const STATUS_BAR_HEIGHT =
     : StatusBar.currentHeight || 0;
 
 export const HEADER_HEIGHT =
-  height * 0.35 + STATUS_BAR_HEIGHT;
+  (initialHeight || 800) * 0.35 + STATUS_BAR_HEIGHT;
 
 // Map of 7 days of the week to their respective JSON animations
 const ANIMATION_URLS: Record<number, string> = {
@@ -36,21 +41,37 @@ const currentDay = new Date().getDay();
 const DYNAMIC_JSON_URL = ANIMATION_URLS[currentDay];
 
 export default function Header() {
+  // Use live window dimensions per-render instead of the module-level
+  // Dimensions.get('window') snapshot, which can be 0x0 during static
+  // pre-rendering (no real browser window at build time).
+  const { height } = useWindowDimensions();
+  const headerHeight = (height || initialHeight || 800) * 0.35 + STATUS_BAR_HEIGHT;
+
+  // Only mount LottieView after client-side hydration. Its remote-JSON
+  // web support is unreliable during Node-based static export and can
+  // silently break the whole render pass.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <View
       style={[
         styles.header,
-        { height: HEADER_HEIGHT },
+        { height: headerHeight },
       ]}
     >
       {/* Animated Background - Dynamically matches the day of the week */}
-      <LottieView
-        source={{ uri: DYNAMIC_JSON_URL }}
-        autoPlay
-        loop
-        resizeMode="cover"
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'transparent' }]}
-      />
+      {mounted && (
+        <LottieView
+          source={{ uri: DYNAMIC_JSON_URL }}
+          autoPlay
+          loop
+          resizeMode="cover"
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'transparent' }]}
+        />
+      )}
 
       {/* Cake Decoration - Maintained Local */}
       <Image
@@ -81,7 +102,7 @@ const styles = StyleSheet.create({
 
   cake: {
     position: 'absolute',
-    
+
     right: -15,
     bottom: 0,
 
@@ -101,7 +122,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
 
-    alignItems: 'flex-end', 
+    alignItems: 'flex-end',
     justifyContent: 'flex-start',
 
     paddingHorizontal: 24,

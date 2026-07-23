@@ -72,26 +72,26 @@ export default function AuthScreen() {
     }
   };
 
-  const handleForgotPassword = async () => {
+    const handleForgotPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      alert('Please enter your email address');
       return;
     }
 
     setLoading(true);
     try {
+      // Directs the recovery link to your Vercel web reset page
+      const webResetUrl = 'https://wonderbakes.vercel.app/reset-password';
+
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'sokohub://',
+        redirectTo: webResetUrl,
       });
 
       if (error) throw error;
 
-      Alert.alert(
-        'Reset Email Sent',
-        'Please check your email (including spam folder) for the reset link.'
-      );
+      alert('Reset Email Sent! Please check your email (including spam folder) for the reset link.');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send reset email');
+      alert(`Error: ${error.message || 'Failed to send reset email'}`);
     } finally {
       setLoading(false);
     }

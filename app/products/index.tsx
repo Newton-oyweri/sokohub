@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     padding: 8,
+    paddingBottom:50,
   },
   centerState: {
     alignItems: 'center',
