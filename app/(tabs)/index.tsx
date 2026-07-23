@@ -12,25 +12,20 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import CakeCarousel from './Cakes/CakeCarousel';
+import CategoryTabs from './Cakes/CategoryTabs';
 import Account from './Account/Account';
 import Header, { HEADER_HEIGHT } from '../../components/Header';
 import DownloadAction from '../../components/DownloadAction';
-import Services from './../../Services/Services';
-import Fashion from './../../Services/Fashion';
-import Electronics from './../../Services/Electronics';
-import { useHomeScreen, CATEGORIES, CategoryKey } from './useHomeScreen';
+import { useHomeScreen, CATEGORIES } from './useHomeScreen';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
 
 // Detects whether the app is running installed as a PWA (web only).
-// Native apps (iOS/Android) never match this, so we bail out early
-// via Platform.OS check — window.matchMedia doesn't exist on native.
 function useIsPWA() {
   const [isPWA, setIsPWA] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return; // native app is never "PWA"
+    if (Platform.OS !== 'web') return;
 
     const standalone =
       (typeof window.matchMedia === 'function' &&
@@ -44,47 +39,6 @@ function useIsPWA() {
   return isPWA;
 }
 
-// Simple mock placeholder shown for every category that doesn't have
-// real content yet. Swap these out for real components as each
-// category gets built.
-function CategoryPlaceholder({ label }: { label: string }) {
-  return (
-    <View style={styles.placeholderWrap}>
-      <Text style={styles.placeholderEmoji}>🚧</Text>
-      <Text style={styles.placeholderTitle}>{label}</Text>
-      <Text style={styles.placeholderSubtitle}>Coming soon</Text>
-    </View>
-  );
-}
-
-// Renders whichever category is active. Bakery is the only category
-// with a real component (CakeCarousel); everything else is a mock
-// placeholder until that category is built out.
-function CategoryContent({ category }: { category: CategoryKey }) {
-  if (category === 'bakery') {
-    return (
-      <>
-        <CakeCarousel />
-      </>
-    );
-  }
-    if (category === 'services') {
-    return <Services />;
-  }
-  if (category === 'electronics') {
-    return <Electronics />;
-  }
-
-  if (category === 'fashion') {
-    return <Fashion />;
-  }
-
-  const meta = CATEGORIES.find((c) => c.key === category)!;
-  return <CategoryPlaceholder label={meta.label} />;
-}
-
-// This is now the ONLY route for this screen. Do not create a second
-// route file for Account — it is a tab of this shell, not a destination.
 export default function App() {
   const {
     activeTab,
@@ -179,7 +133,6 @@ export default function App() {
           </View>
 
           <View style={styles.contentCard}>
-            {/* Category row - now inside contentCard, below tabs */}
             {activeTab === 'cakes' && (
               <Animated.View style={{ opacity: categoryOpacity }}>
                 <ScrollView
@@ -208,7 +161,7 @@ export default function App() {
 
             <View style={styles.contentBody}>
               {activeTab === 'cakes' ? (
-                <CategoryContent category={activeCategory} />
+                <CategoryTabs activeCategory={activeCategory} />
               ) : (
                 <Account />
               )}
@@ -235,12 +188,10 @@ export default function App() {
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F4FF',
-    
   },
   headerBackground: {
     position: 'absolute',
@@ -340,9 +291,6 @@ const styles = StyleSheet.create({
   categoryChipActive: {
     backgroundColor: '#6b46c1',
   },
-  categoryIcon: {
-    fontSize: 15,
-  },
   categoryLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -357,34 +305,6 @@ const styles = StyleSheet.create({
   },
   contentBody: {
     flex: 1,
-  },
-  bakeryPrompt: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 4,
-  },
-  placeholderWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-  },
-  placeholderEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  placeholderTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  placeholderSubtitle: {
-    fontSize: 14,
-    color: '#9CA3AF',
   },
   fixedNotifIconContainer: {
     position: 'absolute',
@@ -414,3 +334,4 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
 });
+
