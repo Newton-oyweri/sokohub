@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfirmOrder from './ConfirmOrder';
 import ProductDisplay from './display';
 import LocationSelector, { ActiveLocation } from './LocationSelector';
+import SizeGuideSelector from './Sizeguide';
 
 const DEFAULT_PRODUCT = {
   id: 'default',
@@ -25,6 +26,7 @@ const DEFAULT_PRODUCT = {
   price: 500,
   description: 'Rich layers with premium sweet cream icing',
   image_urls: ['https://via.placeholder.com/400x300/6b46c1/ffffff?text=Wonderland'],
+  category: 'fashion',
 };
 
 interface InfoModalState {
@@ -95,10 +97,11 @@ export default function OrderScreen() {
         price: parseFloat(params.price as string) || DEFAULT_PRODUCT.price,
         description: (params.description as string) || DEFAULT_PRODUCT.description,
         image_urls: imageUrls.length > 0 ? imageUrls : DEFAULT_PRODUCT.image_urls,
+        category: (params.category as string) || 'fashion',
       };
     }
     return DEFAULT_PRODUCT;
-  }, [params.id, params.seller_id, params.name, params.price, params.description, params.image_urls]);
+  }, [params.id, params.seller_id, params.name, params.price, params.description, params.image_urls, params.category]);
 
   const [quantity, setQuantity] = useState(1);
   const [customWriting, setCustomWriting] = useState('');
@@ -110,10 +113,6 @@ export default function OrderScreen() {
 
   const [infoModal, setInfoModal] = useState<InfoModalState | null>(null);
 
-  // Bumped every time this screen regains focus (e.g. coming back from the
-  // location-picker screen via router.back()). Passing this as `key` to
-  // LocationSelector forces it to fully remount and re-run its fetch/read
-  // logic, instead of sitting stale because OrderScreen never unmounted.
   const [locationRefreshKey, setLocationRefreshKey] = useState(0);
 
   useFocusEffect(
@@ -173,7 +172,12 @@ export default function OrderScreen() {
       >
         <ProductDisplay product={product} />
 
-        {/* Location Selection Component */}
+        {/* Fashion Category Size Guides Dropdown */}
+         <SizeGuideSelector
+  categoryId={product.category}
+  productCategoryId={params.product_category_id as string}
+/>
+       {/* Location Selection Component */}
         <LocationSelector
           key={locationRefreshKey}
           onLocationFetched={(loc) => setSelectedLocation(loc)}
@@ -414,3 +418,4 @@ const styles = StyleSheet.create({
   },
   modalButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
+
