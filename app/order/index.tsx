@@ -27,6 +27,7 @@ const DEFAULT_PRODUCT = {
   description: 'Rich layers with premium sweet cream icing',
   image_urls: ['https://via.placeholder.com/400x300/6b46c1/ffffff?text=Wonderland'],
   category: 'fashion',
+  product_category_id: 'fashion',
 };
 
 interface InfoModalState {
@@ -98,13 +99,25 @@ export default function OrderScreen() {
         description: (params.description as string) || DEFAULT_PRODUCT.description,
         image_urls: imageUrls.length > 0 ? imageUrls : DEFAULT_PRODUCT.image_urls,
         category: (params.category as string) || 'fashion',
+        product_category_id: (params.product_category_id as string) || 'fashion',
       };
     }
     return DEFAULT_PRODUCT;
-  }, [params.id, params.seller_id, params.name, params.price, params.description, params.image_urls, params.category]);
+  }, [
+    params.id,
+    params.seller_id,
+    params.name,
+    params.price,
+    params.description,
+    params.image_urls,
+    params.category,
+    params.product_category_id,
+  ]);
 
   const [quantity, setQuantity] = useState(1);
   const [customWriting, setCustomWriting] = useState('');
+  const [selectedSize, setSelectedSize] = useState('L');
+  const [selectedColor, setSelectedColor] = useState('Khaki');
   const [selectedLocation, setSelectedLocation] = useState<ActiveLocation | null>(null);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -132,6 +145,10 @@ export default function OrderScreen() {
       ? params.seller_id
       : product.seller_id || '';
 
+  const isFashion =
+    product.product_category_id?.toLowerCase() === 'fashion' ||
+    product.category?.toLowerCase().includes('fashion');
+
   const cakePricePerUnit = product.price;
   const serviceFee = 0;
   const subtotal = cakePricePerUnit * quantity;
@@ -140,8 +157,8 @@ export default function OrderScreen() {
   const fulfillmentMethod = selectedLocation?.location_type || 'door_delivery';
   const displayAddress = selectedLocation?.displayAddress || '';
 
-  const handleIncrement = () => setQuantity(prev => prev + 1);
-  const handleDecrement = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
+  const handleIncrement = () => setQuantity((prev) => prev + 1);
+  const handleDecrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 
   const triggerCheckoutModal = () => {
     if (!selectedLocation || !displayAddress) {
@@ -161,6 +178,15 @@ export default function OrderScreen() {
     });
   };
 
+  // Build full order note combining size, color & custom message for checkout flow
+  const finalOrderNote = [
+    isFashion ? `Size: ${selectedSize}` : null,
+    isFashion ? `Color: ${selectedColor}` : null,
+    customWriting ? `Note: ${customWriting}` : null,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -172,12 +198,17 @@ export default function OrderScreen() {
       >
         <ProductDisplay product={product} />
 
-        {/* Fashion Category Size Guides Dropdown */}
-         <SizeGuideSelector
-  categoryId={product.category}
-  productCategoryId={params.product_category_id as string}
-/>
-       {/* Location Selection Component */}
+        {/* Fashion Category Options & Size Guides Dropdown */}
+        <SizeGuideSelector
+          categoryId={product.category}
+          productCategoryId={product.product_category_id}
+          selectedSize={selectedSize}
+          onSelectSize={setSelectedSize}
+          selectedColor={selectedColor}
+          onSelectColor={setSelectedColor}
+        />
+
+        {/* Location Selection Component */}
         <LocationSelector
           key={locationRefreshKey}
           onLocationFetched={(loc) => setSelectedLocation(loc)}
@@ -185,11 +216,11 @@ export default function OrderScreen() {
 
         {/* Custom Message */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Custom Message</Text>
-          <Text style={styles.sectionSubtitle}>Anything you'd like us to write on it? (Optional)</Text>
+          <Text style={styles.sectionTitle}>Custom Instructions</Text>
+          <Text style={styles.sectionSubtitle}>Anything else you'd like us to know? (Optional)</Text>
           <TextInput
             style={styles.textInput}
-            placeholder="e.g., Happy Birthday John!"
+            placeholder="e.g., Deliver after 3 PM"
             placeholderTextColor="#94a3b8"
             value={customWriting}
             onChangeText={setCustomWriting}
@@ -290,7 +321,7 @@ export default function OrderScreen() {
           seller_id: product.seller_id,
         }}
         quantity={quantity}
-        customWriting={customWriting}
+        customWriting={finalOrderNote}
         fulfillmentMethod={fulfillmentMethod}
         deliveryAddress={displayAddress}
         totalPrice={totalPrice}

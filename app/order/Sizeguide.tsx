@@ -1,7 +1,7 @@
+// Sizeguide.tsx
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   LayoutAnimation,
   Platform,
@@ -11,7 +11,6 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { supabase } from '@/lib/supabase'; // Adjust path to your Supabase client instance
 
 if (
   Platform.OS === 'android' &&
@@ -33,87 +32,118 @@ const SIZE_GUIDES = {
   },
 };
 
+const CLOTH_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const SHOE_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
+const COLORS = [
+  { name: 'Black', hex: '#0f172a' },
+  { name: 'White', hex: '#ffffff', border: '#cbd5e1' },
+  { name: 'Khaki', hex: '#c2b280' },
+  { name: 'Olive', hex: '#556b2f' },
+  { name: 'Navy', hex: '#1e3a8a' },
+  { name: 'Beige', hex: '#f5f5dc', border: '#e2e8f0' },
+];
+
 type GuideType = 'cloth' | 'shoe';
 
 interface SizeGuideSelectorProps {
-  categoryId?: string;           // products.category (FK -> categories.id)
-  productCategoryId?: string;    // Direct route param if available
+  categoryId?: string;
+  productCategoryId?: string;
+  selectedSize: string;
+  onSelectSize: (size: string) => void;
+  selectedColor: string;
+  onSelectColor: (color: string) => void;
 }
 
 export default function SizeGuideSelector({
   categoryId,
   productCategoryId,
+  selectedSize,
+  onSelectSize,
+  selectedColor,
+  onSelectColor,
 }: SizeGuideSelectorProps) {
   const [activeGuide, setActiveGuide] = useState<GuideType | null>(null);
-  const [resolvedProductCatId, setResolvedProductCatId] = useState<string | null>(
-    productCategoryId || null
-  );
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // If productCategoryId was passed directly via params, no need to query
-    if (productCategoryId) {
-      setResolvedProductCatId(productCategoryId);
-      return;
-    }
+  // Check if product belongs to fashion
+  const isFashion =
+    productCategoryId?.toLowerCase() === 'fashion' ||
+    categoryId?.toLowerCase().includes('fashion') ||
+    categoryId?.toLowerCase().includes('cloth') ||
+    categoryId?.toLowerCase().includes('shoe');
 
-    // Otherwise, fetch categories.product_category_id using categoryId (categories.id)
-    if (!categoryId) return;
-
-    let isMounted = true;
-
-    async function fetchProductCategoryId() {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('categories')
-          .select('product_category_id')
-          .eq('id', categoryId)
-          .single();
-
-        if (error) {
-          console.error('Error fetching product category:', error.message);
-          return;
-        }
-
-        if (isMounted && data?.product_category_id) {
-          setResolvedProductCatId(data.product_category_id);
-        }
-      } catch (err) {
-        console.error('Failed to resolve category:', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    }
-
-    fetchProductCategoryId();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [categoryId, productCategoryId]);
-
-  // Check if the resolved parent category ID is 'fashion'
-  const isFashion = resolvedProductCatId?.toLowerCase() === 'fashion';
-
-  if (loading) {
-    return null; // Silent load while checking category
-  }
-
-  if (!isFashion) {
-    return null; // Hide completely for non-fashion items
-  }
+  if (!isFashion) return null;
 
   const toggleGuide = (type: GuideType) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveGuide((prev) => (prev === type ? null : type));
   };
 
+  const isShoeCategory = categoryId?.toLowerCase().includes('shoe');
+  const availableSizes = isShoeCategory ? SHOE_SIZES : CLOTH_SIZES;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Size Guides</Text>
+      {/* 1. Size Selection */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>
+          Select Size {selectedSize ? `· ${selectedSize}` : ''}
+        </Text>
+      </View>
+      <View style={styles.chipRow}>
+        {availableSizes.map((size) => {
+          const isSelected = selectedSize === size;
+          return (
+            <TouchableOpacity
+              key={size}
+              style={[styles.sizeChip, isSelected && styles.sizeChipSelected]}
+              onPress={() => onSelectSize(size)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.sizeChipText,
+                  isSelected && styles.sizeChipTextSelected,
+                ]}
+              >
+                {size}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-      {/* Accordion Trigger Buttons */}
+      {/* 2. Color Selection */}
+      <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+        Select Color {selectedColor ? `· ${selectedColor}` : ''}
+      </Text>
+      <View style={styles.chipRow}>
+        {COLORS.map((col) => {
+          const isSelected = selectedColor === col.name;
+          return (
+            <TouchableOpacity
+              key={col.name}
+              style={[
+                styles.colorChip,
+                { backgroundColor: col.hex },
+                col.border ? { borderWidth: 1, borderColor: col.border } : null,
+                isSelected && styles.colorChipSelected,
+              ]}
+              onPress={() => onSelectColor(col.name)}
+              activeOpacity={0.7}
+            >
+              {isSelected && (
+                <Ionicons
+                  name="checkmark"
+                  size={16}
+                  color={col.hex === '#ffffff' || col.hex === '#f5f5dc' ? '#0f172a' : '#ffffff'}
+                />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* 3. Expandable Size Chart Accordion Triggers */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tabButton, activeGuide === 'cloth' && styles.activeTab]}
@@ -122,7 +152,7 @@ export default function SizeGuideSelector({
         >
           <Ionicons
             name="shirt-outline"
-            size={18}
+            size={16}
             color={activeGuide === 'cloth' ? '#6b46c1' : '#64748b'}
           />
           <Text
@@ -131,11 +161,11 @@ export default function SizeGuideSelector({
               activeGuide === 'cloth' && styles.activeTabText,
             ]}
           >
-            Clothing Chart
+            Clothing Guide
           </Text>
           <Ionicons
             name={activeGuide === 'cloth' ? 'chevron-up' : 'chevron-down'}
-            size={16}
+            size={14}
             color={activeGuide === 'cloth' ? '#6b46c1' : '#64748b'}
           />
         </TouchableOpacity>
@@ -147,7 +177,7 @@ export default function SizeGuideSelector({
         >
           <Ionicons
             name="footsteps-outline"
-            size={18}
+            size={16}
             color={activeGuide === 'shoe' ? '#6b46c1' : '#64748b'}
           />
           <Text
@@ -156,17 +186,17 @@ export default function SizeGuideSelector({
               activeGuide === 'shoe' && styles.activeTabText,
             ]}
           >
-            Shoe Chart
+            Shoe Guide
           </Text>
           <Ionicons
             name={activeGuide === 'shoe' ? 'chevron-up' : 'chevron-down'}
-            size={16}
+            size={14}
             color={activeGuide === 'shoe' ? '#6b46c1' : '#64748b'}
           />
         </TouchableOpacity>
       </View>
 
-      {/* Expanded Image View */}
+      {/* 4. Expanded Image View */}
       {activeGuide && (
         <View style={styles.imageCard}>
           <Text style={styles.imageTitle}>{SIZE_GUIDES[activeGuide].title}</Text>
@@ -186,36 +216,89 @@ export default function SizeGuideSelector({
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     marginBottom: 24,
   },
-  headerTitle: {
-    fontSize: 16,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 10,
   },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sizeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  sizeChipSelected: {
+    borderColor: '#6b46c1',
+    backgroundColor: '#faf5ff',
+  },
+  sizeChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  sizeChipTextSelected: {
+    color: '#6b46c1',
+    fontWeight: '700',
+  },
+  colorChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorChipSelected: {
+    borderWidth: 2.5,
+    borderColor: '#6b46c1',
+  },
   tabContainer: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
   },
   activeTab: {
     borderColor: '#6b46c1',
     backgroundColor: '#faf5ff',
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#64748b',
   },
@@ -224,22 +307,20 @@ const styles = StyleSheet.create({
   },
   imageCard: {
     marginTop: 12,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
     alignItems: 'center',
   },
   imageTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#6b46c1',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   guideImage: {
     width: '100%',
-    borderRadius: 10,
+    borderRadius: 8,
   },
 });
 
