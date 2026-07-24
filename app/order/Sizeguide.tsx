@@ -33,17 +33,22 @@ const SIZE_GUIDES = {
 };
 
 const CLOTH_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-const SHOE_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
+const SHOE_SIZES = ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
+
 const COLORS = [
   { name: 'Black', hex: '#0f172a' },
   { name: 'White', hex: '#ffffff', border: '#cbd5e1' },
   { name: 'Khaki', hex: '#c2b280' },
   { name: 'Olive', hex: '#556b2f' },
   { name: 'Navy', hex: '#1e3a8a' },
-  { name: 'Beige', hex: '#f5f5dc', border: '#e2e8f0' },
+  { name: 'Beige', hex: '#f5f5dc', border: '#cbd5e1' },
+  { name: 'Red', hex: '#dc2626' },
+  { name: 'Grey', hex: '#64748b' },
+  { name: 'Brown', hex: '#78350f' },
 ];
 
 type GuideType = 'cloth' | 'shoe';
+type SizeType = 'cloth' | 'shoe';
 
 interface SizeGuideSelectorProps {
   categoryId?: string;
@@ -64,6 +69,14 @@ export default function SizeGuideSelector({
 }: SizeGuideSelectorProps) {
   const [activeGuide, setActiveGuide] = useState<GuideType | null>(null);
 
+  const initialSizeType: SizeType =
+    categoryId?.toLowerCase().includes('shoe') ||
+    productCategoryId?.toLowerCase().includes('shoe')
+      ? 'shoe'
+      : 'cloth';
+
+  const [selectedSizeType, setSelectedSizeType] = useState<SizeType>(initialSizeType);
+
   // Check if product belongs to fashion
   const isFashion =
     productCategoryId?.toLowerCase() === 'fashion' ||
@@ -78,12 +91,67 @@ export default function SizeGuideSelector({
     setActiveGuide((prev) => (prev === type ? null : type));
   };
 
-  const isShoeCategory = categoryId?.toLowerCase().includes('shoe');
-  const availableSizes = isShoeCategory ? SHOE_SIZES : CLOTH_SIZES;
+  const handleSizeTypeChange = (type: SizeType) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedSizeType(type);
+    // Reset to default size for the selected category type
+    onSelectSize(type === 'shoe' ? SHOE_SIZES[2] : CLOTH_SIZES[3]);
+  };
+
+  const availableSizes = selectedSizeType === 'shoe' ? SHOE_SIZES : CLOTH_SIZES;
 
   return (
     <View style={styles.container}>
-      {/* 1. Size Selection */}
+      {/* 1. Size Type Toggle (Clothing vs Shoes) */}
+      <View style={styles.sizeTypeToggleRow}>
+        <TouchableOpacity
+          style={[
+            styles.typeChip,
+            selectedSizeType === 'cloth' && styles.typeChipActive,
+          ]}
+          onPress={() => handleSizeTypeChange('cloth')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="shirt-outline"
+            size={15}
+            color={selectedSizeType === 'cloth' ? '#6b46c1' : '#64748b'}
+          />
+          <Text
+            style={[
+              styles.typeChipText,
+              selectedSizeType === 'cloth' && styles.typeChipTextActive,
+            ]}
+          >
+            Clothing Sizes
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.typeChip,
+            selectedSizeType === 'shoe' && styles.typeChipActive,
+          ]}
+          onPress={() => handleSizeTypeChange('shoe')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="footsteps-outline"
+            size={15}
+            color={selectedSizeType === 'shoe' ? '#6b46c1' : '#64748b'}
+          />
+          <Text
+            style={[
+              styles.typeChipText,
+              selectedSizeType === 'shoe' && styles.typeChipTextActive,
+            ]}
+          >
+            Shoe Sizes
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 2. Size Values Selector */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>
           Select Size {selectedSize ? `· ${selectedSize}` : ''}
@@ -112,8 +180,8 @@ export default function SizeGuideSelector({
         })}
       </View>
 
-      {/* 2. Color Selection */}
-      <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+      {/* 3. Color Selection with Color Pills & Labels */}
+      <Text style={[styles.sectionTitle, { marginTop: 18 }]}>
         Select Color {selectedColor ? `· ${selectedColor}` : ''}
       </Text>
       <View style={styles.chipRow}>
@@ -123,27 +191,45 @@ export default function SizeGuideSelector({
             <TouchableOpacity
               key={col.name}
               style={[
-                styles.colorChip,
-                { backgroundColor: col.hex },
-                col.border ? { borderWidth: 1, borderColor: col.border } : null,
-                isSelected && styles.colorChipSelected,
+                styles.colorCard,
+                isSelected && styles.colorCardSelected,
               ]}
               onPress={() => onSelectColor(col.name)}
               activeOpacity={0.7}
             >
-              {isSelected && (
-                <Ionicons
-                  name="checkmark"
-                  size={16}
-                  color={col.hex === '#ffffff' || col.hex === '#f5f5dc' ? '#0f172a' : '#ffffff'}
-                />
-              )}
+              <View
+                style={[
+                  styles.colorDot,
+                  { backgroundColor: col.hex },
+                  col.border ? { borderWidth: 1, borderColor: col.border } : null,
+                ]}
+              >
+                {isSelected && (
+                  <Ionicons
+                    name="checkmark"
+                    size={12}
+                    color={
+                      col.hex === '#ffffff' || col.hex === '#f5f5dc'
+                        ? '#0f172a'
+                        : '#ffffff'
+                    }
+                  />
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.colorLabel,
+                  isSelected && styles.colorLabelSelected,
+                ]}
+              >
+                {col.name}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* 3. Expandable Size Chart Accordion Triggers */}
+      {/* 4. Expandable Size Chart Accordion Triggers */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tabButton, activeGuide === 'cloth' && styles.activeTab]}
@@ -196,7 +282,7 @@ export default function SizeGuideSelector({
         </TouchableOpacity>
       </View>
 
-      {/* 4. Expanded Image View */}
+      {/* 5. Expanded Image View */}
       {activeGuide && (
         <View style={styles.imageCard}>
           <Text style={styles.imageTitle}>{SIZE_GUIDES[activeGuide].title}</Text>
@@ -223,13 +309,45 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     marginBottom: 24,
   },
+  sizeTypeToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  typeChipActive: {
+    backgroundColor: '#faf5ff',
+    borderColor: '#6b46c1',
+  },
+  typeChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  typeChipTextActive: {
+    color: '#6b46c1',
+    fontWeight: '700',
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 10,
@@ -262,16 +380,36 @@ const styles = StyleSheet.create({
     color: '#6b46c1',
     fontWeight: '700',
   },
-  colorChip: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  colorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  colorCardSelected: {
+    borderColor: '#6b46c1',
+    backgroundColor: '#faf5ff',
+  },
+  colorDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  colorChipSelected: {
-    borderWidth: 2.5,
-    borderColor: '#6b46c1',
+  colorLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  colorLabelSelected: {
+    color: '#6b46c1',
+    fontWeight: '700',
   },
   tabContainer: {
     flexDirection: 'row',

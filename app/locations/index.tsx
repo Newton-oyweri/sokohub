@@ -42,6 +42,19 @@ function InfoModal({
   info: InfoModalState | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
+
+  const handleButtonPress = () => {
+    // Check if this is an authentication error
+    if (info?.title === 'Authentication Required') {
+      // Navigate to auth page
+      router.push('/auth');
+    } else {
+      // Otherwise, just close the modal
+      onClose();
+    }
+  };
+
   return (
     <Modal
       visible={!!info}
@@ -71,10 +84,12 @@ function InfoModal({
               styles.modalButton,
               info?.isError && { backgroundColor: '#ef4444' },
             ]}
-            onPress={onClose}
+            onPress={handleButtonPress}
             activeOpacity={0.8}
           >
-            <Text style={styles.modalButtonText}>Got it</Text>
+            <Text style={styles.modalButtonText}>
+              {info?.title === 'Authentication Required' ? 'Sign In' : 'Got it'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

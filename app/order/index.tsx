@@ -199,14 +199,16 @@ export default function OrderScreen() {
         <ProductDisplay product={product} />
 
         {/* Fashion Category Options & Size Guides Dropdown */}
-        <SizeGuideSelector
-          categoryId={product.category}
-          productCategoryId={product.product_category_id}
-          selectedSize={selectedSize}
-          onSelectSize={setSelectedSize}
-          selectedColor={selectedColor}
-          onSelectColor={setSelectedColor}
-        />
+        {isFashion && (
+          <SizeGuideSelector
+            categoryId={product.category}
+            productCategoryId={product.product_category_id}
+            selectedSize={selectedSize}
+            onSelectSize={setSelectedSize}
+            selectedColor={selectedColor}
+            onSelectColor={setSelectedColor}
+          />
+        )}
 
         {/* Location Selection Component */}
         <LocationSelector
