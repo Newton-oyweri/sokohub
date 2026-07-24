@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 
-type PlatformKind = 'ios' | 'android' | 'other';
+type OSKind = 'ios' | 'android' | 'other';
+type BrowserKind = 'safari' | 'chrome' | 'firefox' | 'samsung' | 'edge' | 'other';
 
 const SLIDES = [
   { icon: 'hand-left-outline', iconSet: 'ion', text: 'Hey there 👋 long day? Let us run the errand' },
@@ -22,7 +23,7 @@ const SLIDES = [
 
 const SLIDE_DURATION = 3000;
 
-function detectPlatform(): PlatformKind {
+function detectOS(): OSKind {
   if (typeof navigator === 'undefined') return 'other';
   const ua = navigator.userAgent || '';
 
@@ -35,6 +36,22 @@ function detectPlatform(): PlatformKind {
   return 'other';
 }
 
+// Order matters: several of these UA substrings overlap
+// (e.g. Chrome, Edge, and Samsung Internet all contain "Safari",
+// and iOS Chrome/Firefox both contain "Safari" too since they're
+// WebKit wrappers under the hood).
+function detectBrowser(): BrowserKind {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent || '';
+
+  if (/EdgiOS|EdgA|Edg\//.test(ua)) return 'edge';
+  if (/SamsungBrowser/.test(ua)) return 'samsung';
+  if (/CriOS|Chrome/.test(ua)) return 'chrome';
+  if (/FxiOS|Firefox/.test(ua)) return 'firefox';
+  if (/Safari/.test(ua)) return 'safari';
+  return 'other';
+}
+
 function isRunningStandalone() {
   if (typeof window === 'undefined') return false;
   const nav = window.navigator as any;
@@ -44,15 +61,68 @@ function isRunningStandalone() {
   );
 }
 
+// Per-browser "add to home screen" copy. iOS Safari and iOS Chrome/Firefox
+// (WebKit-based, no beforeinstallprompt) both need manual steps, but the
+// menu item and icon are in different places, so the instructions differ.
+function getInstallSteps(os: OSKind, browser: BrowserKind) {
+  if (os === 'ios') {
+    if (browser === 'chrome') {
+      return [
+        { icon: 'ellipsis-horizontal-outline', text: '1. Tap the "•••" menu in Chrome' },
+        { icon: 'add-circle-outline', text: '2. Choose "Add to Home Screen"' },
+        { icon: 'checkmark-circle-outline', text: '3. Tap "Add" — you\'re all set!' },
+      ];
+    }
+    if (browser === 'firefox') {
+      return [
+        { icon: 'ellipsis-horizontal-outline', text: '1. Tap the menu icon in Firefox' },
+        { icon: 'add-circle-outline', text: '2. Choose "Share" then "Add to Home Screen"' },
+        { icon: 'checkmark-circle-outline', text: '3. Tap "Add" — you\'re all set!' },
+      ];
+    }
+    // Safari (default on iOS)
+    return [
+      { icon: 'share-outline', text: "1. Tap the Share icon in Safari's toolbar" },
+      { icon: 'add-circle-outline', text: '2. Choose "Add to Home Screen"' },
+      { icon: 'checkmark-circle-outline', text: '3. Tap "Add" — you\'re all set!' },
+    ];
+  }
+
+  if (browser === 'samsung') {
+    return [
+      { icon: 'ellipsis-horizontal-outline', text: '1. Tap the menu icon in Samsung Internet' },
+      { icon: 'add-circle-outline', text: '2. Choose "Add page to" then "Home screen"' },
+      { icon: 'checkmark-circle-outline', text: '3. Tap "Add" — you\'re all set!' },
+    ];
+  }
+
+  if (browser === 'firefox') {
+    return [
+      { icon: 'ellipsis-horizontal-outline', text: '1. Tap the menu icon in Firefox' },
+      { icon: 'add-circle-outline', text: '2. Choose "Install"' },
+      { icon: 'checkmark-circle-outline', text: '3. Confirm — you\'re all set!' },
+    ];
+  }
+
+  // Fallback for Android/desktop Chrome/Edge without a captured
+  // beforeinstallprompt event, or any other unrecognized browser.
+  return [
+    { icon: 'ellipsis-horizontal-outline', text: '1. Open your browser menu' },
+    { icon: 'add-circle-outline', text: '2. Look for "Install app" or "Add to Home Screen"' },
+    { icon: 'checkmark-circle-outline', text: '3. Confirm — you\'re all set!' },
+  ];
+}
+
 export default function DownloadAction() {
   const [visible, setVisible] = useState(true);
   const [index, setIndex] = useState(0);
-  const [platform, setPlatform] = useState<PlatformKind>('other');
-  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
+  const [os, setOS] = useState<OSKind>('other');
+  const [browser, setBrowser] = useState<BrowserKind>('other');
+  const [showInstructions, setShowInstructions] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
   const deferredPromptRef = useRef<any>(null);
 
-  // Detect platform + whether already installed, once on mount
+  // Detect platform + browser + whether already installed, once on mount
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
@@ -61,7 +131,8 @@ export default function DownloadAction() {
       return;
     }
 
-    setPlatform(detectPlatform());
+    setOS(detectOS());
+    setBrowser(detectBrowser());
 
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
@@ -110,8 +181,9 @@ export default function DownloadAction() {
   }
 
   const handlePress = async () => {
-    if (platform === 'ios') {
-      setShowIOSInstructions((prev) => !prev);
+    // iOS never fires beforeinstallprompt, on any browser — always manual steps
+    if (os === 'ios') {
+      setShowInstructions((prev) => !prev);
       return;
     }
 
@@ -125,13 +197,15 @@ export default function DownloadAction() {
       return;
     }
 
-    // No native install prompt available (desktop Safari, already dismissed, etc.)
-    // Fall back to showing the same instructions pattern so the user isn't stuck.
-    setShowIOSInstructions((prev) => !prev);
+    // No native install prompt available (Firefox, Samsung Internet,
+    // desktop Safari, already dismissed, etc.) — fall back to
+    // browser-specific manual instructions instead of native prompt.
+    setShowInstructions((prev) => !prev);
   };
 
   const slide = SLIDES[index];
-  const buttonLabel = platform === 'ios' ? 'Add to Home Screen' : 'Download Now';
+  const buttonLabel = os === 'ios' ? 'Add to Home Screen' : 'Download Now';
+  const steps = getInstructionsCache(os, browser);
 
   return (
     <View style={styles.wrapper}>
@@ -166,25 +240,23 @@ export default function DownloadAction() {
         </TouchableOpacity>
       </View>
 
-      {showIOSInstructions && (
+      {showInstructions && (
         <View style={styles.iosCard}>
-          <View style={styles.iosStepRow}>
-            <Ionicons name="share-outline" size={16} color="#6b46c1" />
-            <Text style={styles.iosStepText}>1. Tap the Share icon in Safari's toolbar</Text>
-          </View>
-          <View style={styles.iosStepRow}>
-            <Ionicons name="add-circle-outline" size={16} color="#6b46c1" />
-            <Text style={styles.iosStepText}>2. Choose "Add to Home Screen"</Text>
-          </View>
-          <View style={styles.iosStepRow}>
-            <Ionicons name="checkmark-circle-outline" size={16} color="#6b46c1" />
-            <Text style={styles.iosStepText}>3. Tap "Add" — you're all set!</Text>
-          </View>
+          {steps.map((step, i) => (
+            <View style={styles.iosStepRow} key={i}>
+              <Ionicons name={step.icon as any} size={16} color="#6b46c1" />
+              <Text style={styles.iosStepText}>{step.text}</Text>
+            </View>
+          ))}
           <Text style={styles.iosHint}>This gives you a faster, full-screen experience.</Text>
         </View>
       )}
     </View>
   );
+}
+
+function getInstructionsCache(os: OSKind, browser: BrowserKind) {
+  return getInstallSteps(os, browser);
 }
 
 const styles = StyleSheet.create({
