@@ -70,49 +70,51 @@ export default function OrderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-
-  const product = useMemo(() => {
-    if (params.id) {
-      let imageUrls: string[] = [];
-      try {
-        if (params.image_urls) {
-          if (typeof params.image_urls === 'string') {
-            if (params.image_urls.startsWith('http')) {
-              imageUrls = [params.image_urls];
-            } else {
-              const parsed = JSON.parse(params.image_urls as string);
-              imageUrls = Array.isArray(parsed) ? parsed : [params.image_urls];
-            }
-          } else if (Array.isArray(params.image_urls)) {
-            imageUrls = params.image_urls as string[];
+const product = useMemo(() => {
+  if (params.id) {
+    let imageUrls: string[] = [];
+    try {
+      if (params.image_urls) {
+        if (typeof params.image_urls === 'string') {
+          if (params.image_urls.startsWith('http')) {
+            imageUrls = [params.image_urls];
+          } else {
+            const parsed = JSON.parse(params.image_urls as string);
+            imageUrls = Array.isArray(parsed) ? parsed : [params.image_urls];
           }
+        } else if (Array.isArray(params.image_urls)) {
+          imageUrls = params.image_urls as string[];
         }
-      } catch (e) {
-        imageUrls = [params.image_urls as string];
       }
-
-      return {
-        id: (params.id as string) || 'default',
-        seller_id: (params.seller_id as string) || DEFAULT_PRODUCT.seller_id,
-        name: (params.name as string) || DEFAULT_PRODUCT.name,
-        price: parseFloat(params.price as string) || DEFAULT_PRODUCT.price,
-        description: (params.description as string) || DEFAULT_PRODUCT.description,
-        image_urls: imageUrls.length > 0 ? imageUrls : DEFAULT_PRODUCT.image_urls,
-        category: (params.category as string) || 'fashion',
-        product_category_id: (params.product_category_id as string) || 'fashion',
-      };
+    } catch (e) {
+      imageUrls = [params.image_urls as string];
     }
-    return DEFAULT_PRODUCT;
-  }, [
-    params.id,
-    params.seller_id,
-    params.name,
-    params.price,
-    params.description,
-    params.image_urls,
-    params.category,
-    params.product_category_id,
-  ]);
+
+    return {
+      id: (params.id as string) || 'default',
+      seller_id: (params.seller_id as string) || DEFAULT_PRODUCT.seller_id,
+      name: (params.name as string) || DEFAULT_PRODUCT.name,
+      price: parseFloat(params.price as string) || DEFAULT_PRODUCT.price,
+      description: (params.description as string) || DEFAULT_PRODUCT.description,
+      image_urls: imageUrls.length > 0 ? imageUrls : DEFAULT_PRODUCT.image_urls,
+      category: (params.category as string) || 'fashion',
+      product_category_id: (params.product_category_id as string) || 'fashion',
+    };
+  }
+  return DEFAULT_PRODUCT;
+}, [params.id, params.seller_id, params.name, params.price, params.description, params.image_urls, params.category, params.product_category_id]);
+
+// Exact match check - only show for fashion category
+const isFashion = 
+  product.product_category_id === 'fashion' ||
+  product.category === 'fashion';
+
+// Debug log
+console.log('🛍️ Product:', { 
+  category: product.category, 
+  productCategoryId: product.product_category_id,
+  isFashion 
+});
 
   const [quantity, setQuantity] = useState(1);
   const [customWriting, setCustomWriting] = useState('');
@@ -144,11 +146,6 @@ export default function OrderScreen() {
     : typeof params.seller_id === 'string'
       ? params.seller_id
       : product.seller_id || '';
-
-  const isFashion =
-    product.product_category_id?.toLowerCase() === 'fashion' ||
-    product.category?.toLowerCase().includes('fashion');
-
   const cakePricePerUnit = product.price;
   const serviceFee = 0;
   const subtotal = cakePricePerUnit * quantity;
