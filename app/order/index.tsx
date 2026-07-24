@@ -1,7 +1,7 @@
 // OrderScreen.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -12,23 +12,28 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfirmOrder from './ConfirmOrder';
 import ProductDisplay from './display';
 import LocationSelector, { ActiveLocation } from './LocationSelector';
 import SizeGuideSelector from './Sizeguide';
+import { supabase } from '../../lib/supabase';
 
-const DEFAULT_PRODUCT = {
-  id: 'default',
-  seller_id: 'default',
-  name: 'Wonderland Special',
-  price: 500,
-  description: 'Rich layers with premium sweet cream icing',
-  image_urls: ['https://via.placeholder.com/400x300/6b46c1/ffffff?text=Wonderland'],
-  category: 'fashion',
-  product_category_id: 'fashion',
-};
+interface Product {
+  id: string;
+  seller_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_urls: string[];
+  category: string;
+  product_category_id: string | null;
+  is_available: boolean;
+  post_type: string;
+  rating: number;
+}
 
 interface InfoModalState {
   title: string;
@@ -70,51 +75,10 @@ export default function OrderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-const product = useMemo(() => {
-  if (params.id) {
-    let imageUrls: string[] = [];
-    try {
-      if (params.image_urls) {
-        if (typeof params.image_urls === 'string') {
-          if (params.image_urls.startsWith('http')) {
-            imageUrls = [params.image_urls];
-          } else {
-            const parsed = JSON.parse(params.image_urls as string);
-            imageUrls = Array.isArray(parsed) ? parsed : [params.image_urls];
-          }
-        } else if (Array.isArray(params.image_urls)) {
-          imageUrls = params.image_urls as string[];
-        }
-      }
-    } catch (e) {
-      imageUrls = [params.image_urls as string];
-    }
 
-    return {
-      id: (params.id as string) || 'default',
-      seller_id: (params.seller_id as string) || DEFAULT_PRODUCT.seller_id,
-      name: (params.name as string) || DEFAULT_PRODUCT.name,
-      price: parseFloat(params.price as string) || DEFAULT_PRODUCT.price,
-      description: (params.description as string) || DEFAULT_PRODUCT.description,
-      image_urls: imageUrls.length > 0 ? imageUrls : DEFAULT_PRODUCT.image_urls,
-      category: (params.category as string) || 'fashion',
-      product_category_id: (params.product_category_id as string) || 'fashion',
-    };
-  }
-  return DEFAULT_PRODUCT;
-}, [params.id, params.seller_id, params.name, params.price, params.description, params.image_urls, params.category, params.product_category_id]);
-
-// Exact match check - only show for fashion category
-const isFashion = 
-  product.product_category_id === 'fashion' ||
-  product.category === 'fashion';
-
-// Debug log
-console.log('🛍️ Product:', { 
-  category: product.category, 
-  productCategoryId: product.product_category_id,
-  isFashion 
-});
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [quantity, setQuantity] = useState(1);
   const [customWriting, setCustomWriting] = useState('');
@@ -136,6 +100,81 @@ console.log('🛍️ Product:', {
     }, [])
   );
 
+  // Fetch product from database
+  useEffect(() => {
+    const fetchProduct = async () => {
+      const productId = params.id as string;
+      
+      if (!productId) {
+        setError('No product ID provided');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const { data, error: fetchError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', productId)
+          .single();
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (!data) {
+          throw new Error('Product not found');
+        }
+
+        // Parse image_urls if it's a string
+        let imageUrls: string[] = [];
+        if (data.image_urls) {
+          if (typeof data.image_urls === 'string') {
+            try {
+              const parsed = JSON.parse(data.image_urls);
+              imageUrls = Array.isArray(parsed) ? parsed : [data.image_urls];
+            } catch {
+              imageUrls = [data.image_urls];
+            }
+          } else if (Array.isArray(data.image_urls)) {
+            imageUrls = data.image_urls;
+          }
+        }
+
+        setProduct({
+          id: data.id,
+          seller_id: data.seller_id,
+          name: data.name,
+          description: data.description,
+          price: parseFloat(data.price),
+          image_urls: imageUrls,
+          category: data.category,
+          product_category_id: data.product_category_id,
+          is_available: data.is_available,
+          post_type: data.post_type,
+          rating: data.rating,
+        });
+      } catch (err) {
+        console.error('Error fetching product:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load product');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
+  }, [params.id]);
+
+  // Check if product is fashion
+  const isFashion = useMemo(() => {
+    if (!product) return false;
+    return product.product_category_id?.toLowerCase() === 'fashion' ||
+           product.category?.toLowerCase() === 'fashion';
+  }, [product]);
+
   const customerId = typeof params.customerId === 'string'
     ? params.customerId
     : typeof params.customer_id === 'string'
@@ -145,8 +184,9 @@ console.log('🛍️ Product:', {
     ? params.sellerId
     : typeof params.seller_id === 'string'
       ? params.seller_id
-      : product.seller_id || '';
-  const cakePricePerUnit = product.price;
+      : product?.seller_id || '';
+
+  const cakePricePerUnit = product?.price || 0;
   const serviceFee = 0;
   const subtotal = cakePricePerUnit * quantity;
   const totalPrice = subtotal + serviceFee;
@@ -184,6 +224,32 @@ console.log('🛍️ Product:', {
     .filter(Boolean)
     .join(' | ');
 
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#6b46c1" />
+        <Text style={styles.loadingText}>Loading product...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error || !product) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#94a3b8" />
+        <Text style={styles.errorText}>{error || 'Product not found'}</Text>
+        <TouchableOpacity 
+          style={styles.errorButton} 
+          onPress={() => router.back()}
+        >
+          <Text style={styles.errorButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -195,11 +261,11 @@ console.log('🛍️ Product:', {
       >
         <ProductDisplay product={product} />
 
-        {/* Fashion Category Options & Size Guides Dropdown */}
+        {/* Fashion Category Options & Size Guides Dropdown - ONLY shows for fashion */}
         {isFashion && (
           <SizeGuideSelector
             categoryId={product.category}
-            productCategoryId={product.product_category_id}
+            productCategoryId={product.product_category_id || ''}
             selectedSize={selectedSize}
             onSelectSize={setSelectedSize}
             selectedColor={selectedColor}
@@ -339,6 +405,35 @@ console.log('🛍️ Product:', {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f4ff' },
+  centerContent: { 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#64748b',
+    marginTop: 16,
+    marginBottom: 24,
+    fontWeight: '500',
+  },
+  errorButton: {
+    backgroundColor: '#6b46c1',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  errorButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   scrollContainer: { padding: 20 },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 6 },
@@ -448,4 +543,3 @@ const styles = StyleSheet.create({
   },
   modalButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
-

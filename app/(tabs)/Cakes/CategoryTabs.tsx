@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet, BackHandler, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import Services from '../../../Services/Services';
@@ -12,8 +12,58 @@ interface CategoryTabsProps {
   scrollY?: Animated.Value;
 }
 
+interface AnimatedChipProps {
+  cat: typeof CATEGORIES[number];
+  isActive: boolean;
+  onPress: (key: CategoryKey) => void;
+}
+
 const BASE_CATEGORY: CategoryKey = 'bakery';
 const isWeb = Platform.OS === 'web';
+
+// --- Sub-component for smooth scale-on-press animation ---
+function AnimatedChip({ cat, isActive, onPress }: AnimatedChipProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 8,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={() => onPress(cat.key)}
+    >
+      <Animated.View
+        style={[
+          styles.categoryChip,
+          isActive && styles.categoryChipActive,
+          { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
+          {cat.label}
+        </Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
   // --- Native path: local history stack ---
@@ -66,27 +116,12 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
       })
     : 1;
 
-  const renderCategoryContent = () => {
-    switch (activeCategory) {
-      case 'bakery':
-        return <CakeCarousel />;
-      case 'services':
-        return <Services />;
-      case 'electronics':
-        return <Electronics />;
-      case 'fashion':
-        return <Fashion />;
-      default: {
-        const meta = CATEGORIES.find((c) => c.key === activeCategory);
-        return (
-          <View style={styles.placeholderWrap}>
-            <Text style={styles.placeholderEmoji}>🚧</Text>
-            <Text style={styles.placeholderTitle}>{meta?.label || 'Category'}</Text>
-            <Text style={styles.placeholderSubtitle}>Coming soon</Text>
-          </View>
-        );
-      }
-    }
+  // Map category keys directly to their components
+  const CATEGORY_COMPONENTS: Partial<Record<CategoryKey, React.ReactNode>> = {
+    bakery: <CakeCarousel />,
+    services: <Services />,
+    electronics: <Electronics />,
+    fashion: <Fashion />,
   };
 
   return (
@@ -97,25 +132,42 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRow}
         >
-          {CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat.key;
-            return (
-              <TouchableOpacity
-                key={cat.key}
-                style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                onPress={() => handleSelectCategory(cat.key)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {CATEGORIES.map((cat) => (
+            <AnimatedChip
+              key={cat.key}
+              cat={cat}
+              isActive={activeCategory === cat.key}
+              onPress={handleSelectCategory}
+            />
+          ))}
         </ScrollView>
       </Animated.View>
 
-      <View style={styles.contentBody}>{renderCategoryContent()}</View>
+      {/* Persistent Content Wrapper */}
+      <View style={styles.contentBody}>
+        {CATEGORIES.map((cat) => {
+          const isActive = activeCategory === cat.key;
+          const ComponentNode = CATEGORY_COMPONENTS[cat.key];
+
+          return (
+            <View
+              key={cat.key}
+              style={[
+                styles.categoryWrapper,
+                { display: isActive ? 'flex' : 'none' },
+              ]}
+            >
+              {ComponentNode || (
+                <View style={styles.placeholderWrap}>
+                  <Text style={styles.placeholderEmoji}>🚧</Text>
+                  <Text style={styles.placeholderTitle}>{cat.label}</Text>
+                  <Text style={styles.placeholderSubtitle}>Coming soon</Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -142,6 +194,10 @@ const styles = StyleSheet.create({
   categoryLabel: { fontSize: 13, fontWeight: '600', color: '#6b46c1' },
   categoryLabelActive: { color: '#ffffff' },
   contentBody: { flex: 1 },
+  categoryWrapper: {
+    flex: 1,
+    width: '100%',
+  },
   placeholderWrap: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -152,3 +208,4 @@ const styles = StyleSheet.create({
   placeholderTitle: { fontSize: 17, fontWeight: '700', color: '#1f2937', marginBottom: 4 },
   placeholderSubtitle: { fontSize: 14, color: '#9CA3AF' },
 });
+

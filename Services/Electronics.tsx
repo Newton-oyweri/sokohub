@@ -5,20 +5,15 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   ActivityIndicator,
-  LayoutAnimation,
-  Platform,
-  UIManager,
+  Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
-// Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+const { width } = Dimensions.get('window');
 
 type Category = {
   id: string;
@@ -46,16 +41,10 @@ export default function Electronics() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  const toggleSidebar = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsSidebarOpen((prev) => !prev);
-  };
 
   // Fetch Electronics Subcategories
   const fetchCategories = async () => {
@@ -78,6 +67,7 @@ export default function Electronics() {
   const fetchProducts = useCallback(async () => {
     try {
       setError(null);
+      setLoading(true);
 
       let query = supabase
         .from('products')
@@ -129,7 +119,6 @@ export default function Electronics() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
     fetchProducts();
   }, [fetchProducts]);
 
@@ -148,12 +137,54 @@ export default function Electronics() {
     });
   };
 
-  const renderProductItem = ({ item }: { item: Product }) => {
+  const getProductSize = (index: number) => {
+    // Create varied sizes: some large (full width), some regular (half width)
+    const pattern = index % 5;
+    if (pattern === 0 || pattern === 3) {
+      return 'large'; // Full width
+    } else {
+      return 'regular'; // Half width
+    }
+  };
+
+  const getProductDimensions = (size: string) => {
+    const padding = 8;
+    const screenWidth = width - (padding * 2);
+    
+    switch(size) {
+      case 'large':
+        return {
+          width: screenWidth,
+          height: 280,
+          marginBottom: 12,
+        };
+      case 'regular':
+      default:
+        const regularWidth = (screenWidth - 8) / 2;
+        return {
+          width: regularWidth,
+          height: 240,
+          marginBottom: 12,
+        };
+    }
+  };
+
+  const renderProductItem = ({ item, index }: { item: Product; index: number }) => {
     const imageUrl = item.image_urls?.[0];
+    const size = getProductSize(index);
+    const dimensions = getProductDimensions(size);
+    const isLarge = size === 'large';
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          {
+            width: dimensions.width,
+            height: dimensions.height,
+            marginBottom: dimensions.marginBottom,
+          }
+        ]}
         activeOpacity={0.85}
         onPress={() => handleProductPress(item)}
       >
@@ -163,289 +194,247 @@ export default function Electronics() {
           resizeMode="cover"
         />
         <View style={styles.cardContent}>
-          <Text style={styles.cardName} numberOfLines={2}>
+          <Text style={[styles.cardName, isLarge && styles.cardNameLarge]} numberOfLines={2}>
             {item.name}
           </Text>
-          <Text style={styles.cardPrice}>{formatKES(item.price)}</Text>
+          <Text style={[styles.cardPrice, isLarge && styles.cardPriceLarge]}>
+            {formatKES(item.price)}
+          </Text>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const renderProductGrid = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#6b46c1" />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={fetchProducts} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (products.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>No items found in this category.</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.gridContainer}>
+        {products.map((item, index) => (
+          <View key={item.id} style={styles.gridItem}>
+            {renderProductItem({ item, index })}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.contentContainer}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.heading}>Electronics & Tech</Text>
-          <Text style={styles.subheading}>Smartphones, laptops, appliances, and accessories</Text>
-        </View>
+        <Text style={styles.heading}>Electronics & Tech</Text>
+        <Text style={styles.subheading}>Smartphones, laptops, appliances, and accessories</Text>
       </View>
 
-      {/* Main Content Area - no flex:1, sizes to its natural content height
-          since this whole component now lives inside the home screen's
-          outer Animated.ScrollView, not its own full-height container. */}
-      <View style={styles.body}>
-        {/* Left Sidebar - plain View, not a ScrollView. The category list is
-            short enough to render inline; the outer screen scroll carries it. */}
-        <View style={[styles.sidebar, !isSidebarOpen && styles.sidebarCollapsed]}>
-          <TouchableOpacity
-            style={styles.sidebarToggle}
-            activeOpacity={0.7}
-            onPress={toggleSidebar}
-          >
-            <Ionicons
-              name={isSidebarOpen ? 'chevron-back' : 'chevron-forward'}
-              size={18}
-              color="#6b46c1"
-            />
-            {isSidebarOpen && <Text style={styles.toggleText}>Categories</Text>}
-          </TouchableOpacity>
-
-          {/* All Items Option */}
+      {/* Categories - Horizontal Scroll */}
+      <View style={styles.categoriesWrapper}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScrollContent}
+        >
           <TouchableOpacity
             style={[
-              styles.categoryTab,
-              selectedCategory === 'all' && styles.activeCategoryTab,
+              styles.categoryChip,
+              selectedCategory === 'all' && styles.activeCategoryChip,
             ]}
             onPress={() => setSelectedCategory('all')}
           >
-            <Ionicons
-              name="grid-outline"
-              size={16}
-              color={selectedCategory === 'all' ? '#6b46c1' : '#6B7280'}
-            />
-            {isSidebarOpen && (
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === 'all' && styles.activeCategoryText,
-                ]}
-                numberOfLines={1}
-              >
-                All Items
-              </Text>
-            )}
+            <Text
+              style={[
+                styles.categoryChipText,
+                selectedCategory === 'all' && styles.activeCategoryChipText,
+              ]}
+            >
+              All
+            </Text>
           </TouchableOpacity>
 
-          {/* Subcategory List */}
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id;
             return (
               <TouchableOpacity
                 key={cat.id}
-                style={[styles.categoryTab, isSelected && styles.activeCategoryTab]}
+                style={[
+                  styles.categoryChip,
+                  isSelected && styles.activeCategoryChip,
+                ]}
                 onPress={() => setSelectedCategory(cat.id)}
               >
-                <Ionicons
-                  name="pricetag-outline"
-                  size={16}
-                  color={isSelected ? '#6b46c1' : '#6B7280'}
-                />
-                {isSidebarOpen && (
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      isSelected && styles.activeCategoryText,
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {cat.name}
-                  </Text>
-                )}
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    isSelected && styles.activeCategoryChipText,
+                  ]}
+                >
+                  {cat.name}
+                </Text>
               </TouchableOpacity>
             );
           })}
-        </View>
-
-        {/* Right Side - Product Content */}
-        <View style={styles.content}>
-          {loading ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#6b46c1" />
-            </View>
-          ) : error ? (
-            <View style={styles.centerContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity onPress={fetchProducts} style={styles.retryButton}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : products.length === 0 ? (
-            <View style={styles.centerContainer}>
-              <Text style={styles.emptyText}>No items found in this category.</Text>
-            </View>
-          ) : (
-            // scrollEnabled=false: this FlatList no longer owns its own scroll.
-            // It just lays out the grid and reports its natural height; the
-            // home screen's outer Animated.ScrollView is the single scroller.
-            <FlatList
-              data={products}
-              keyExtractor={(item) => item.id}
-              renderItem={renderProductItem}
-              numColumns={2}
-              scrollEnabled={Platform.OS === 'web' ? true : false}
-              columnWrapperStyle={styles.columnWrapper}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={true}
-            />
-          )}
-        </View>
+        </ScrollView>
       </View>
-    </View>
+
+      {/* Products Grid */}
+      {renderProductGrid()}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingBottom: 56,
+  },
+  contentContainer: {
+    paddingBottom: 60,
   },
   header: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  headerTitleContainer: {
-    justifyContent: 'center',
-  },
   heading: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#1f2937',
   },
   subheading: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6B7280',
     marginTop: 2,
   },
-  body: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  /* Left Sidebar Styling */
-  sidebar: {
-    width: '32%',
-    backgroundColor: '#F3F4F6',
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
-  },
-  sidebarCollapsed: {
-    width: 52,
-  },
-  sidebarToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  categoriesWrapper: {
+    backgroundColor: '#FFFFFF',
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    backgroundColor: '#EEF2FF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    gap: 4,
   },
-  toggleText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6b46c1',
-  },
-  categoryTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  categoriesScrollContent: {
+    paddingHorizontal: 16,
     gap: 8,
   },
-  activeCategoryTab: {
-    backgroundColor: '#FFFFFF',
-    borderLeftWidth: 4,
-    borderLeftColor: '#6b46c1',
-  },
-  categoryText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#4B5563',
-    fontWeight: '500',
-  },
-  activeCategoryText: {
-    color: '#6b46c1',
-    fontWeight: '700',
-  },
-  /* Right Side Content Styling */
-  content: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  centerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#EF4444',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingHorizontal: 16,
+  categoryChip: {
+    paddingHorizontal: 18,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    marginRight: 8,
+  },
+  activeCategoryChip: {
     backgroundColor: '#6b46c1',
   },
-  retryText: {
-    color: '#FFF',
-    fontWeight: '600',
-    fontSize: 12,
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#4B5563',
   },
-  listContent: {
-    padding: 8,
+  activeCategoryChipText: {
+    color: '#FFFFFF',
   },
-  columnWrapper: {
+  gridContainer: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 10,
+  },
+  gridItem: {
+    // No extra styles - just container for the card
   },
   card: {
-    width: '48.5%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   cardImage: {
     width: '100%',
-    height: 110,
+    height: '75%',
     backgroundColor: '#F3F4F6',
   },
   cardContent: {
-    padding: 8,
+    padding: 10,
+    height: '25%',
+    justifyContent: 'center',
   },
   cardName: {
     fontSize: 12,
     fontWeight: '500',
     color: '#1F2937',
-    minHeight: 32,
+    marginBottom: 2,
+  },
+  cardNameLarge: {
+    fontSize: 14,
   },
   cardPrice: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#6b46c1',
-    marginTop: 4,
+  },
+  cardPriceLarge: {
+    fontSize: 16,
+  },
+  centerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 200,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#6b46c1',
+  },
+  retryText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
-

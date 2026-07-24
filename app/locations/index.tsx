@@ -14,8 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// Import your configured Supabase client here
-import { supabase } from '../../lib/supabase'; 
+import { supabase } from '../../lib/supabase';
 
 interface County {
   id: string;
@@ -42,19 +41,6 @@ function InfoModal({
   info: InfoModalState | null;
   onClose: () => void;
 }) {
-  const router = useRouter();
-
-  const handleButtonPress = () => {
-    // Check if this is an authentication error
-    if (info?.title === 'Authentication Required') {
-      // Navigate to auth page
-      router.push('/auth');
-    } else {
-      // Otherwise, just close the modal
-      onClose();
-    }
-  };
-
   return (
     <Modal
       visible={!!info}
@@ -84,12 +70,10 @@ function InfoModal({
               styles.modalButton,
               info?.isError && { backgroundColor: '#ef4444' },
             ]}
-            onPress={handleButtonPress}
+            onPress={onClose}
             activeOpacity={0.8}
           >
-            <Text style={styles.modalButtonText}>
-              {info?.title === 'Authentication Required' ? 'Sign In' : 'Got it'}
-            </Text>
+            <Text style={styles.modalButtonText}>Got it</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -103,11 +87,11 @@ export default function LocationsScreen() {
 
   // Tab & Selection state
   const [locationType, setLocationType] = useState<'pickup' | 'delivery'>('pickup');
-  
+
   // Data lists
   const [counties, setCounties] = useState<County[]>([]);
   const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([]);
-  
+
   // Selections & Inputs
   const [selectedCounty, setSelectedCounty] = useState<County | null>(null);
   const [selectedPickup, setSelectedPickup] = useState<PickupLocation | null>(null);
@@ -198,15 +182,12 @@ export default function LocationsScreen() {
     try {
       setIsSaving(true);
 
-      // Get authenticated user
+      // Check authentication FIRST - if not authenticated, navigate directly to auth
       const { data: { user }, error: userErr } = await supabase.auth.getUser();
 
       if (userErr || !user) {
-        setInfoModal({
-          title: 'Authentication Required',
-          message: 'Please sign in to save your location preferences.',
-          isError: true,
-        });
+        // Navigate directly to auth without showing modal
+        router.push('/auth');
         return;
       }
 
@@ -501,7 +482,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: 20 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
   headerSubtitle: { fontSize: 13, color: '#64748b', marginTop: 4 },
-  
+
   // Tabs
   typeSelector: {
     flexDirection: 'row',
@@ -632,7 +613,7 @@ const styles = StyleSheet.create({
   },
   deliveryRow: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   deliveryIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: '30%' },
@@ -720,4 +701,3 @@ const styles = StyleSheet.create({
   },
   modalButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
-

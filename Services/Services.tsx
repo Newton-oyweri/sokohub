@@ -12,6 +12,7 @@ import {
   LayoutAnimation,
   UIManager,
   Animated,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -31,6 +32,7 @@ export interface ServiceItem {
   name: string;
   price: number;
   description?: string;
+  image_urls?: string[] | null;
 }
 
 type Props = {
@@ -118,7 +120,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
       setLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('id, seller_id, name, price, description')
+        .select('id, seller_id, name, price, description, image_urls')
         .eq('post_type', 'booking')
         .eq('is_available', true)
         .order('name', { ascending: true });
@@ -290,40 +292,62 @@ export default function Services({ onSelectService, sellerId }: Props) {
 
   const renderItem = ({ item }: { item: ServiceItem }) => {
     const isExpanded = expandedId === item.id;
+    const imageUrl = item.image_urls && item.image_urls.length > 0 ? item.image_urls[0] : null;
 
     return (
       <View style={styles.card}>
         <TouchableOpacity
-          style={styles.row}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
           onPress={() => {
             toggleExpand(item.id);
             onSelectService?.(item);
           }}
         >
-          <View style={styles.nameContainer}>
-            <Text style={styles.name}>{item.name}</Text>
-            {item.description ? (
-              <Text style={styles.description} numberOfLines={2}>
+          {/* Large Hero Service Image (Only rendered if an image exists) */}
+          {imageUrl ? (
+            <View style={styles.imageBannerContainer}>
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+            </View>
+          ) : null}
+
+          {/* Header Row: Title & Price */}
+          <View style={styles.row}>
+            <View style={styles.nameContainer}>
+              <Text style={styles.name}>{item.name}</Text>
+            </View>
+
+            <View style={styles.rightHeaderWrap}>
+              <View style={styles.priceWrap}>
+                <Text style={styles.priceLabel}>Starting from</Text>
+                <Text style={styles.priceValue}>{formatKES(item.price)}</Text>
+              </View>
+              <Ionicons
+                name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color="#6B7280"
+                style={{ marginLeft: 8 }}
+              />
+            </View>
+          </View>
+
+          {/* Service Description: Truncated when collapsed, Full when expanded */}
+          {item.description ? (
+            <View style={styles.descriptionContainer}>
+              <Text
+                style={styles.description}
+                numberOfLines={isExpanded ? undefined : 2}
+              >
                 {item.description}
               </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.rightHeaderWrap}>
-            <View style={styles.priceWrap}>
-              <Text style={styles.priceLabel}>Starting from</Text>
-              <Text style={styles.priceValue}>{formatKES(item.price)}</Text>
             </View>
-            <Ionicons
-              name={isExpanded ? 'chevron-up' : 'chevron-down'}
-              size={18}
-              color="#6B7280"
-              style={{ marginLeft: 8 }}
-            />
-          </View>
+          ) : null}
         </TouchableOpacity>
 
+        {/* Expanded Form Section */}
         {isExpanded && (
           <View style={styles.expandedContainer}>
             <TextInput
@@ -472,15 +496,16 @@ export default function Services({ onSelectService, sellerId }: Props) {
           </View>
         </View>
       </Modal>
+<FlatList
+  data={services}
+  keyExtractor={(item) => item.id}
+  renderItem={renderItem}
+  ListHeaderComponent={renderHeader}
+  ListFooterComponent={renderFooter}
+  contentContainerStyle={styles.listContent}
+  scrollEnabled={Platform.OS === 'web'} // <-- ADD THIS
+/>
 
-      <FlatList
-        data={services}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        contentContainerStyle={styles.listContent}
-      />
     </View>
   );
 }
@@ -496,15 +521,28 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 13, color: '#4B5563', lineHeight: 18 },
   bold: { fontWeight: '700', color: '#1F2937' },
   subheading: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' },
+  
+  // Large Hero Image Display
+  imageBannerContainer: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#F3F4F6',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, paddingHorizontal: 16 },
   nameContainer: { flex: 1, marginRight: 10 },
-  name: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
-  description: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  name: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  descriptionContainer: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 },
+  description: { fontSize: 13, color: '#4B5563', lineHeight: 19 },
   rightHeaderWrap: { flexDirection: 'row', alignItems: 'center' },
   priceWrap: { alignItems: 'flex-end' },
   priceLabel: { fontSize: 10, color: '#9CA3AF' },
-  priceValue: { fontSize: 14, fontWeight: '700', color: '#6B46C1', marginTop: 1 },
+  priceValue: { fontSize: 15, fontWeight: '700', color: '#6B46C1', marginTop: 1 },
   expandedContainer: { padding: 14, backgroundColor: '#FAF5FF', borderTopWidth: 1, borderTopColor: '#F3E8FF' },
   formInput: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9D8FD', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: '#1F2937', marginBottom: 8 },
   textArea: { height: 52, textAlignVertical: 'top' },
