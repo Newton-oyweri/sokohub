@@ -118,12 +118,14 @@ export default function Services({ onSelectService, sellerId }: Props) {
   const loadServices = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, seller_id, name, price, description, image_urls')
-        .eq('post_type', 'booking')
-        .eq('is_available', true)
-        .order('name', { ascending: true });
+     
+       const { data, error } = await supabase
+  .from('products')
+  .select('id, seller_id, name, price, description, image_urls')
+  .eq('post_type', 'booking')
+  .eq('product_category_id', 'services')   // ← add this
+  .eq('is_available', true)
+  .order('name', { ascending: true });
 
       if (error) throw error;
       setServices((data as ServiceItem[]) || []);
