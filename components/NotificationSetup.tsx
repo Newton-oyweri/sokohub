@@ -5,21 +5,15 @@ import { Router, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
-// expo-file-system's File/Paths API is native-only — importing/instantiating
-// it on web throws at module-load time, which crashes the entire app before
-// React even mounts. Only create these on native platforms.
 let productGridCache: any = null;
 let pinnedProductsCache: any = null;
 
+// Safeguard 1: Safe dynamic require for native-only file system
 if (Platform.OS !== 'web') {
   const { File, Paths } = require('expo-file-system');
   productGridCache = new File(Paths.cache, 'product_grid_cache.json');
   pinnedProductsCache = new File(Paths.cache, 'pinned_products_cache.json');
-}
 
-// Configure foreground notifications behavior — native only, this API
-// doesn't exist/work the same way on web.
-if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -36,22 +30,23 @@ export default function NotificationSetup() {
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
-    // Push notifications aren't supported on web in this setup — skip entirely.
+    // Safeguard 2: Exit early on Web to completely isolate native logic
     if (Platform.OS === 'web') return;
 
-    // Listen to changes in user authentication state
+    // 1. Force prompt check on app launch regardless of login state
+    initPushNotifications();
+
+    // 2. React to auth state changes to map tokens on login/logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         registerForPushNotifications(session.user.id);
       }
     });
 
-    // Fires when the user TAPS a notification while the app is running
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       routeFromNotificationData(router, response.notification.request.content.data);
     });
 
-    // Handles the case where the app was fully closed and the tap LAUNCHED it
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (response) {
         routeFromNotificationData(router, response.notification.request.content.data);
@@ -64,8 +59,26 @@ export default function NotificationSetup() {
     };
   }, []);
 
-  const registerForPushNotifications = async (userId: string) => {
+  const initPushNotifications = async () => {
+    if (Platform.OS === 'web') return;
+    const { data: { session } } = await supabase.auth.getSession();
+    await registerForPushNotifications(session?.user?.id);
+  };
+
+  const registerForPushNotifications = async (userId?: string) => {
+    if (Platform.OS === 'web') return;
+
     try {
+      // Set Android Channel FIRST (Required for Android 13+ permission prompts)
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#6b46c1',
+        });
+      }
+
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
@@ -79,38 +92,27 @@ export default function NotificationSetup() {
         return;
       }
 
-      // Fetch token tied directly to your EAS Project ID
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: '41c96e3f-d6b2-49fd-bccc-323ce431dcfb',
       });
 
       const token = tokenData.data;
 
-      if (token) {
-        // Sync token back to profiles
+      // Upsert token to user profile if authenticated
+      if (token && userId) {
         await supabase
           .from('profiles')
           .update({ expo_push_token: token })
           .eq('id', userId);
       }
-
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#6b46c1',
-        });
-      }
     } catch (error) {
-      console.error('Error handling push registration:', error);
+      console.error('Error registering push notifications:', error);
     }
   };
 
-  return null; // This component runs entirely in the background
+  return null;
 }
 
-// Rewritten routing handler that deep-links directly into the order section if product data exists
 export async function routeFromNotificationData(router: Router, data: any) {
   if (Platform.OS === 'web') {
     router.push("/notifications");
@@ -122,42 +124,37 @@ export async function routeFromNotificationData(router: Router, data: any) {
     return;
   }
 
-  // Intercept new product updates launched from system trays or notification cards
   if (data.status === 'new_product' || data.productId) {
     try {
       let matchedProduct: any = null;
       const targetId = data.productId;
-      const targetName = data.productName; // Helpful fallback query parameter matching if sent via payload
+      const targetName = data.productName;
 
-      // 1. Search the Weekly Specials cache file
       if (targetId && pinnedProductsCache?.exists) {
         const content = await pinnedProductsCache.text();
         const list = JSON.parse(content || '[]');
         matchedProduct = list.find((p: any) => p.id === targetId || (targetName && p.name === targetName));
       }
 
-      // 2. Search the Main Catalog item grid cache file
       if (!matchedProduct && targetId && productGridCache?.exists) {
         const content = await productGridCache.text();
         const list = JSON.parse(content || '[]');
         matchedProduct = list.find((p: any) => p.id === targetId || (targetName && p.name === targetName));
       }
 
-      // 3. Remote Server query fallback if not indexed locally yet
       if (!matchedProduct && (targetId || targetName)) {
         let query = supabase.from('products').select('*');
-        
+
         if (targetId) {
           query = query.eq('id', targetId);
         } else {
           query = query.ilike('name', targetName);
         }
-        
+
         const { data: serverProduct } = await query.limit(1).maybeSingle();
         if (serverProduct) matchedProduct = serverProduct;
       }
 
-      // Direct navigation transfer with clean argument mapping parameters string-coerced
       if (matchedProduct) {
         router.push({
           pathname: '../order',
@@ -178,6 +175,6 @@ export async function routeFromNotificationData(router: Router, data: any) {
     }
   }
 
-  // Fallback default routing point if notification belongs to administrative state/status changes
   router.push("/notifications");
 }
+

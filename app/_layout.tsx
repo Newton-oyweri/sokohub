@@ -11,6 +11,8 @@ import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import NotificationSetup from '@/components/NotificationSetup';
+import { configureNotifications } from "@/lib/notifications";
 
 const WIDE_LAYOUT_BREAKPOINT = 900;
 const APP_COLUMN_WIDTH = 480;
@@ -27,6 +29,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    configureNotifications();
     supabase.auth.getSession();
   }, []);
 
@@ -37,11 +40,9 @@ export default function RootLayout() {
     };
 
     const handleUrl = (url: string) => {
-      // If it's a password recovery link, route the user to the dedicated screen
       if (url.includes('/auth/v1/verify') || url.includes('type=recovery') || url.includes('error=')) {
         const hashPart = url.split('#')[1] || url.split('?')[1];
 
-        // Forward to the reset-password screen along with the URL fragment payload
         router.replace({
           pathname: '/reset-password',
           params: { fallbackUrl: url, hash: hashPart }
@@ -73,6 +74,9 @@ export default function RootLayout() {
   const appContent = (
     <>
       <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
+
+      {/* Global setup component mounted */}
+      <NotificationSetup />
 
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="auth" />

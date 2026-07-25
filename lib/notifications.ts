@@ -1,5 +1,6 @@
-// /lib/notifications
+// lib/notifications.ts
 import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 
 export const DEFAULT_SOUND = "notification_sound.wav";
 
@@ -12,6 +13,8 @@ export async function sendNotification({
   body: string;
   data?: Record<string, unknown>;
 }) {
+  if (Platform.OS === 'web') return; // Prevent Web crash
+
   await Notifications.scheduleNotificationAsync({
     content: {
       title,
@@ -25,6 +28,8 @@ export async function sendNotification({
 }
 
 export async function configureNotifications() {
+  if (Platform.OS === 'web') return; // Prevent Web crash
+
   await Notifications.setNotificationChannelAsync("default", {
     name: "Default",
     importance: Notifications.AndroidImportance.MAX,
@@ -33,3 +38,4 @@ export async function configureNotifications() {
     lightColor: "#FF231F7C",
   });
 }
+
