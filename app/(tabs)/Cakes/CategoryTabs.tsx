@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet, BackHandler, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
-import Services from '../../../Services/Services';
 import Fashion from '../../../Services/Fashion';
 import Electronics from '../../../Services/Electronics';
 import CakeCarousel from './CakeCarousel';
@@ -119,7 +118,6 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
   // Map category keys directly to their components
   const CATEGORY_COMPONENTS: Partial<Record<CategoryKey, React.ReactNode>> = {
     bakery: <CakeCarousel />,
-    services: <Services />,
     electronics: <Electronics />,
     fashion: <Fashion />,
   };
