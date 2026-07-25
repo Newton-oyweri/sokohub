@@ -78,7 +78,7 @@ export default function ServiceCard({
         ) : null}
       </TouchableOpacity>
 
-      {/* Form Container — Plain View to keep inputs focusable on Web & Mobile */}
+      {/* Expanded Form Section */}
       {isExpanded && (
         <View style={styles.expandedContainer}>
           <TextInput

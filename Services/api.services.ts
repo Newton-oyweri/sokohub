@@ -10,7 +10,7 @@ export interface ServiceItem {
 }
 
 /**
- * Fetches all available products under the 'services' category, regardless of post_type.
+ * Fetches all available products under the 'services' category.
  */
 export async function fetchAllAvailableServices(): Promise<ServiceItem[]> {
   const { data, error } = await supabase
@@ -64,32 +64,6 @@ export async function createCallbackRequest(params: {
       status: 'pending',
       user_phone: params.userPhone,
       notes: params.notes,
-    },
-  ]);
-
-  if (error) throw error;
-}
-
-/**
- * Submits a custom task request.
- */
-export async function createCustomTaskRequest(params: {
-  userId: string;
-  sellerId?: string | null;
-  taskText: string;
-  userPhone: string;
-}) {
-  const { error } = await supabase.from('service_requests').insert([
-    {
-      user_id: params.userId,
-      seller_id: params.sellerId || null,
-      service_id: null,
-      service_name: params.taskText,
-      amount: null,
-      request_type: 'custom_task',
-      status: 'pending',
-      user_phone: params.userPhone,
-      notes: params.taskText,
     },
   ]);
 

@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  TextInput,
   ActivityIndicator,
   Modal,
   Platform,
@@ -25,7 +24,6 @@ import {
   fetchAllAvailableServices,
   fetchUserProfilePhone,
   createCallbackRequest,
-  createCustomTaskRequest,
 } from './api.services';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -53,9 +51,7 @@ type ConfirmModalState = {
 export default function Services({ onSelectService, sellerId }: Props) {
   const router = useRouter();
   const [services, setServices] = useState<ServiceItem[]>([]);
-  const [customTask, setCustomTask] = useState('');
   const [loading, setLoading] = useState(true);
-  const [submittingCustom, setSubmittingCustom] = useState(false);
 
   // Accordion State
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -202,55 +198,8 @@ export default function Services({ onSelectService, sellerId }: Props) {
     }
   };
 
-  const handleCustomTask = async () => {
-    const taskText = customTask.trim();
-    if (!taskText) return;
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      showConfirmModal(
-        'Authentication Required',
-        'Please log in to submit custom task requests.',
-        'Sign In',
-        () => router.push('/auth')
-      );
-      return;
-    }
-
-    if (!userPhone.trim()) {
-      showToast('error', 'Please add a phone number so we can reach you.');
-      return;
-    }
-
-    showConfirmModal(
-      'Confirm Custom Task Request',
-      `Send request for: "${taskText}"?\n\nWe will call ${userPhone.trim()} to discuss details and timing.`,
-      'Submit Request',
-      () => submitCustomTask(taskText, session.user.id)
-    );
-  };
-
-  const submitCustomTask = async (taskText: string, uid: string) => {
-    setSubmittingCustom(true);
-    try {
-      await createCustomTaskRequest({
-        userId: uid,
-        sellerId: sellerId,
-        taskText,
-        userPhone: userPhone.trim(),
-      });
-
-      showToast('success', 'Your custom task request has been received!');
-      setCustomTask('');
-    } catch (err: any) {
-      showToast('error', err.message || 'Could not submit custom task.');
-    } finally {
-      setSubmittingCustom(false);
-    }
-  };
-
   const renderHeader = () => (
-    <View>
+    <View style={styles.headerContainer}>
       <Text style={styles.heading}>Services</Text>
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>ℹ️ How it works</Text>
@@ -259,33 +208,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
         </Text>
       </View>
       <Text style={styles.subheading}>Tap a service to expand and request a callback.</Text>
-    </View>
-  );
-
-  const renderFooter = () => (
-    <View style={styles.customTaskContainer}>
-      <Text style={styles.customTaskTitle}>Don't see what you need?</Text>
-      <Text style={styles.customTaskSubtitle}>Describe your custom task and request a quote:</Text>
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. Assemble IKEA furniture..."
-          placeholderTextColor="#9CA3AF"
-          value={customTask}
-          onChangeText={setCustomTask}
-        />
-        <TouchableOpacity
-          style={[styles.submitButton, (!customTask.trim() || submittingCustom) && styles.disabledButton]}
-          disabled={!customTask.trim() || submittingCustom}
-          onPress={handleCustomTask}
-        >
-          {submittingCustom ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.submitButtonText}>Request</Text>
-          )}
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
@@ -300,7 +222,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
 
   const content = (
     <View style={styles.mainWrapper}>
-      {/* Screen-Centered Toast Banner */}
+      {/* Screen-Centered Floating Warning / Toast Overlay */}
       {toast && (
         <View style={styles.centerToastOverlay} pointerEvents="none">
           <Animated.View
@@ -376,7 +298,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
           />
         )}
         ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
       />
@@ -405,20 +326,13 @@ const styles = StyleSheet.create({
   loaderContainer: { paddingVertical: 50, alignItems: 'center', justifyContent: 'center' },
   loaderText: { marginTop: 10, fontSize: 14, color: '#6B7280' },
   listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
+  headerContainer: { marginBottom: 8 },
   heading: { fontSize: 22, fontWeight: '700', color: '#1F2937' },
   infoCard: { marginTop: 12, marginBottom: 14, padding: 14, borderRadius: 12, backgroundColor: '#F8F5FF', borderWidth: 1, borderColor: '#E9D8FD' },
   infoTitle: { fontSize: 14, fontWeight: '700', color: '#6B46C1', marginBottom: 4 },
   infoText: { fontSize: 13, color: '#4B5563', lineHeight: 18 },
   bold: { fontWeight: '700', color: '#1F2937' },
   subheading: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
-  customTaskContainer: { marginTop: 16, padding: 16, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' },
-  customTaskTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
-  customTaskSubtitle: { fontSize: 13, color: '#6B7280', marginTop: 2, marginBottom: 12 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { flex: 1, height: 44, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: '#1F2937', backgroundColor: '#FAFAFA' },
-  submitButton: { height: 44, paddingHorizontal: 16, backgroundColor: '#6B46C1', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  disabledButton: { backgroundColor: '#C4B5FD' },
-  submitButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
 
   // Screen-Centered Floating Warning / Toast Overlay
   centerToastOverlay: {
