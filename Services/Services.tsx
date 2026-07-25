@@ -13,10 +13,20 @@ import {
   UIManager,
   Animated,
   Image,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import {
+  ServiceItem,
+  fetchAllAvailableServices,
+  fetchUserProfilePhone,
+  createCallbackRequest,
+  createCustomTaskRequest,
+} from './api.services';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -24,15 +34,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 function formatKES(amount: number) {
   return `KSh ${amount.toLocaleString('en-KE')}`;
-}
-
-export interface ServiceItem {
-  id: string;
-  seller_id?: string;
-  name: string;
-  price: number;
-  description?: string;
-  image_urls?: string[] | null;
 }
 
 type Props = {
@@ -114,21 +115,12 @@ export default function Services({ onSelectService, sellerId }: Props) {
     setModalConfig(null);
   };
 
-  // 1. Fetch live services
+  // 1. Fetch live services (Filters strictly: product_category_id = 'services' AND is_available = true)
   const loadServices = async () => {
     try {
       setLoading(true);
-     
-       const { data, error } = await supabase
-  .from('products')
-  .select('id, seller_id, name, price, description, image_urls')
-  .eq('post_type', 'booking')
-  .eq('product_category_id', 'services')   // ← add this
-  .eq('is_available', true)
-  .order('name', { ascending: true });
-
-      if (error) throw error;
-      setServices((data as ServiceItem[]) || []);
+      const data = await fetchAllAvailableServices();
+      setServices(data);
     } catch (err: any) {
       showToast('error', 'Unable to load services.');
     } finally {
@@ -138,18 +130,8 @@ export default function Services({ onSelectService, sellerId }: Props) {
 
   // 2. Fetch logged-in user profile phone
   const loadUserProfile = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('phone')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    if (!error && data?.phone) {
-      setUserPhone(data.phone);
-    }
+    const phone = await fetchUserProfilePhone();
+    if (phone) setUserPhone(phone);
   };
 
   const toggleExpand = (id: string) => {
@@ -178,7 +160,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
     return null;
   };
 
-  // 3. Request Callback for Existing Service
+  // 3. Request Callback
   const handleRequestCallback = async (item: ServiceItem) => {
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -209,21 +191,15 @@ export default function Services({ onSelectService, sellerId }: Props) {
   const submitCallback = async (item: ServiceItem, uid: string) => {
     setSubmittingAction(true);
     try {
-      const { error } = await supabase.from('service_requests').insert([
-        {
-          user_id: uid,
-          seller_id: item.seller_id || sellerId || null,
-          service_id: item.id,
-          service_name: item.name,
-          amount: item.price,
-          request_type: 'callback',
-          status: 'pending',
-          user_phone: userPhone.trim(),
-          notes: notes.trim(),
-        },
-      ]);
-
-      if (error) throw error;
+      await createCallbackRequest({
+        userId: uid,
+        sellerId: item.seller_id || sellerId,
+        serviceId: item.id,
+        serviceName: item.name,
+        amount: item.price,
+        userPhone: userPhone.trim(),
+        notes: notes.trim(),
+      });
 
       showToast('success', `We'll call you shortly regarding "${item.name}".`);
       setExpandedId(null);
@@ -235,7 +211,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
     }
   };
 
-  // 4. Submit Custom Unlisted Task -> directly into `service_requests`
+  // 4. Submit Custom Unlisted Task
   const handleCustomTask = async () => {
     const taskText = customTask.trim();
     if (!taskText) return;
@@ -267,21 +243,12 @@ export default function Services({ onSelectService, sellerId }: Props) {
   const submitCustomTask = async (taskText: string, uid: string) => {
     setSubmittingCustom(true);
     try {
-      const { error } = await supabase.from('service_requests').insert([
-        {
-          user_id: uid,
-          seller_id: sellerId || null,
-          service_id: null,
-          service_name: taskText,
-          amount: null,
-          request_type: 'custom_task',
-          status: 'pending',
-          user_phone: userPhone.trim(),
-          notes: taskText,
-        },
-      ]);
-
-      if (error) throw error;
+      await createCustomTaskRequest({
+        userId: uid,
+        sellerId: sellerId,
+        taskText,
+        userPhone: userPhone.trim(),
+      });
 
       showToast('success', 'Your custom task request has been received!');
       setCustomTask('');
@@ -305,7 +272,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
             onSelectService?.(item);
           }}
         >
-          {/* Large Hero Service Image (Only rendered if an image exists) */}
           {imageUrl ? (
             <View style={styles.imageBannerContainer}>
               <Image
@@ -316,7 +282,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
             </View>
           ) : null}
 
-          {/* Header Row: Title & Price */}
           <View style={styles.row}>
             <View style={styles.nameContainer}>
               <Text style={styles.name}>{item.name}</Text>
@@ -336,7 +301,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
             </View>
           </View>
 
-          {/* Service Description: Truncated when collapsed, Full when expanded */}
           {item.description ? (
             <View style={styles.descriptionContainer}>
               <Text
@@ -349,7 +313,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
           ) : null}
         </TouchableOpacity>
 
-        {/* Expanded Form Section */}
         {isExpanded && (
           <View style={styles.expandedContainer}>
             <TextInput
@@ -441,74 +404,80 @@ export default function Services({ onSelectService, sellerId }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      {toast && (
-        <Animated.View
-          style={[
-            styles.toast,
-            toast.type === 'success' ? styles.toastSuccess : styles.toastError,
-            { opacity: toastOpacity },
-          ]}
-        >
-          <Ionicons
-            name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
-            size={18}
-            color="#FFFFFF"
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={{ flex: 1 }}>
+          {toast && (
+            <Animated.View
+              style={[
+                styles.toast,
+                toast.type === 'success' ? styles.toastSuccess : styles.toastError,
+                { opacity: toastOpacity },
+              ]}
+            >
+              <Ionicons
+                name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                size={18}
+                color="#FFFFFF"
+              />
+              <Text style={styles.toastText}>{toast.message}</Text>
+            </Animated.View>
+          )}
+
+          <Modal
+            visible={!!modalConfig?.visible}
+            transparent
+            animationType="fade"
+            onRequestClose={closeModal}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContainer}>
+                <View style={styles.modalHeaderIcon}>
+                  <Ionicons name="help-circle-outline" size={32} color="#6B46C1" />
+                </View>
+                <Text style={styles.modalTitle}>{modalConfig?.title}</Text>
+                <Text style={styles.modalMessage}>{modalConfig?.message}</Text>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    activeOpacity={0.7}
+                    onPress={closeModal}
+                  >
+                    <Text style={styles.modalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.modalConfirmBtn}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      const cb = modalConfig?.onConfirm;
+                      closeModal();
+                      cb?.();
+                    }}
+                  >
+                    <Text style={styles.modalConfirmText}>{modalConfig?.confirmText}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <FlatList
+            data={services}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ListHeaderComponent={renderHeader}
+            ListFooterComponent={renderFooter}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
           />
-          <Text style={styles.toastText}>{toast.message}</Text>
-        </Animated.View>
-      )}
-
-      {/* Modern Cross-Platform Confirmation Modal */}
-      <Modal
-        visible={!!modalConfig?.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeaderIcon}>
-              <Ionicons name="help-circle-outline" size={32} color="#6B46C1" />
-            </View>
-            <Text style={styles.modalTitle}>{modalConfig?.title}</Text>
-            <Text style={styles.modalMessage}>{modalConfig?.message}</Text>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                activeOpacity={0.7}
-                onPress={closeModal}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalConfirmBtn}
-                activeOpacity={0.8}
-                onPress={() => {
-                  const cb = modalConfig?.onConfirm;
-                  closeModal();
-                  cb?.();
-                }}
-              >
-                <Text style={styles.modalConfirmText}>{modalConfig?.confirmText}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
-      </Modal>
-<FlatList
-  data={services}
-  keyExtractor={(item) => item.id}
-  renderItem={renderItem}
-  ListHeaderComponent={renderHeader}
-  ListFooterComponent={renderFooter}
-  contentContainerStyle={styles.listContent}
-  scrollEnabled={Platform.OS === 'web'} // <-- ADD THIS
-/>
-
-    </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -524,8 +493,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700', color: '#1F2937' },
   subheading: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' },
-  
-  // Large Hero Image Display
+
   imageBannerContainer: {
     width: '100%',
     height: 180,
@@ -580,7 +548,6 @@ const styles = StyleSheet.create({
   toastError: { backgroundColor: '#DC2626' },
   toastText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', flex: 1 },
 
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
