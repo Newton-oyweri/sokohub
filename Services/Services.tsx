@@ -8,8 +8,6 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
-  LayoutAnimation,
-  UIManager,
   Animated,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
@@ -25,10 +23,6 @@ import {
   fetchUserProfilePhone,
   createCallbackRequest,
 } from './api.services';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 type Props = {
   onSelectService?: (service: ServiceItem) => void;
@@ -52,13 +46,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
   const router = useRouter();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Accordion State
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  // Form Inputs
   const [userPhone, setUserPhone] = useState('');
-  const [notes, setNotes] = useState('');
   const [submittingAction, setSubmittingAction] = useState(false);
 
   // Toast State
@@ -122,18 +110,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
     if (phone) setUserPhone(phone);
   };
 
-  const toggleExpand = (id: string) => {
-    if (Platform.OS !== 'web') {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    }
-    if (expandedId === id) {
-      setExpandedId(null);
-    } else {
-      setExpandedId(id);
-      setNotes('');
-    }
-  };
-
   const validateFields = (): string | null => {
     if (!userPhone.trim()) {
       return 'Please enter a phone number so we can reach you.';
@@ -141,9 +117,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
     const digitsOnly = userPhone.trim().replace(/[^0-9+]/g, '');
     if (digitsOnly.length < 9) {
       return 'That phone number looks too short. Please double-check it.';
-    }
-    if (!notes.trim()) {
-      return 'Please add a few details about what you need before requesting a callback.';
     }
     return null;
   };
@@ -169,7 +142,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
 
     showConfirmModal(
       'Confirm Callback Request',
-      `We'll call ${userPhone.trim()} about "${item.name}".\n\nNote: ${notes.trim()}`,
+      `We'll call ${userPhone.trim()} about "${item.name}".`,
       'Send Request',
       () => submitCallback(item, session.user.id)
     );
@@ -185,12 +158,10 @@ export default function Services({ onSelectService, sellerId }: Props) {
         serviceName: item.name,
         amount: item.price,
         userPhone: userPhone.trim(),
-        notes: notes.trim(),
+        notes: `Callback requested for ${item.name}`,
       });
 
       showToast('success', `We'll call you shortly regarding "${item.name}".`);
-      setExpandedId(null);
-      setNotes('');
     } catch (err: any) {
       showToast('error', err.message || 'Could not process callback request.');
     } finally {
@@ -207,7 +178,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
           Prices shown are <Text style={styles.bold}>one-time starting rates</Text>. Request a callback and we'll confirm details and pricing with you directly.
         </Text>
       </View>
-      <Text style={styles.subheading}>Tap a service to expand and request a callback.</Text>
+      <Text style={styles.subheading}>Tap "Request Callback" to get started.</Text>
     </View>
   );
 
@@ -284,16 +255,8 @@ export default function Services({ onSelectService, sellerId }: Props) {
         renderItem={({ item }) => (
           <ServiceCard
             item={item}
-            isExpanded={expandedId === item.id}
             userPhone={userPhone}
-            notes={notes}
             submittingAction={submittingAction}
-            onToggleExpand={() => {
-              toggleExpand(item.id);
-              onSelectService?.(item);
-            }}
-            onPhoneChange={setUserPhone}
-            onNotesChange={setNotes}
             onRequestCallback={() => handleRequestCallback(item)}
           />
         )}
@@ -403,4 +366,3 @@ const styles = StyleSheet.create({
   modalConfirmBtn: { flex: 1, height: 42, borderRadius: 8, backgroundColor: '#6B46C1', justifyContent: 'center', alignItems: 'center' },
   modalConfirmText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
 });
-

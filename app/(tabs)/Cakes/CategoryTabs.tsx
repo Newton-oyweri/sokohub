@@ -21,9 +21,6 @@ interface AnimatedChipProps {
 const BASE_CATEGORY: CategoryKey = 'bakery';
 const isWeb = Platform.OS === 'web';
 
-const isValidCategory = (key: unknown): key is CategoryKey =>
-  CATEGORIES.some((c) => c.key === key);
-
 // --- Sub-component for smooth scale-on-press animation ---
 function AnimatedChip({ cat, isActive, onPress }: AnimatedChipProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -69,7 +66,7 @@ function AnimatedChip({ cat, isActive, onPress }: AnimatedChipProps) {
 }
 
 export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
-  // --- Native path: local history stack (untouched) ---
+  // --- Native path: local history stack ---
   const [navHistory, setNavHistory] = useState<CategoryKey[]>([BASE_CATEGORY]);
 
   // --- Web path: URL-driven state ---
@@ -77,42 +74,15 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
   const pathname = usePathname();
   const { category } = useLocalSearchParams<{ category?: string }>();
 
-  // Read the URL directly on first paint. On web, useLocalSearchParams can
-  // lag behind the real browser URL immediately after a hard refresh, which
-  // was causing the tab to fall back to BASE_CATEGORY while the address bar
-  // still showed the correct ?category=... value.
-  const getInitialWebCategory = (): CategoryKey => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const cat = params.get('category');
-      if (isValidCategory(cat)) return cat;
-    }
-    return BASE_CATEGORY;
-  };
-
-  const [webCategory, setWebCategory] = useState<CategoryKey>(getInitialWebCategory);
-
-  // Keep webCategory in sync with router-driven navigation (tab clicks,
-  // browser back/forward) after the initial mount.
-  useEffect(() => {
-    if (!isWeb) return;
-    if (isValidCategory(category)) {
-      setWebCategory(category as CategoryKey);
-    }
-  }, [category]);
-
   // Single source of truth depending on platform
   const activeCategory: CategoryKey = isWeb
-    ? webCategory
+    ? (category as CategoryKey) || BASE_CATEGORY
     : navHistory[navHistory.length - 1];
 
   const handleSelectCategory = (key: CategoryKey) => {
     if (key === activeCategory) return;
 
     if (isWeb) {
-      // Update immediately so there's no flash back to the old tab while
-      // router.push resolves.
-      setWebCategory(key);
       router.push({ pathname, params: { category: key } });
     } else {
       setNavHistory((prev) => {
