@@ -12,7 +12,6 @@ import {
   LayoutAnimation,
   UIManager,
   Animated,
-  Image,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Keyboard,
@@ -20,6 +19,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import ServiceCard from './ServiceCard';
 import {
   ServiceItem,
   fetchAllAvailableServices,
@@ -30,10 +30,6 @@ import {
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-function formatKES(amount: number) {
-  return `KSh ${amount.toLocaleString('en-KE')}`;
 }
 
 type Props = {
@@ -111,11 +107,8 @@ export default function Services({ onSelectService, sellerId }: Props) {
     });
   };
 
-  const closeModal = () => {
-    setModalConfig(null);
-  };
+  const closeModal = () => setModalConfig(null);
 
-  // 1. Fetch live services (Filters strictly: product_category_id = 'services' AND is_available = true)
   const loadServices = async () => {
     try {
       setLoading(true);
@@ -128,7 +121,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
     }
   };
 
-  // 2. Fetch logged-in user profile phone
   const loadUserProfile = async () => {
     const phone = await fetchUserProfilePhone();
     if (phone) setUserPhone(phone);
@@ -160,7 +152,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
     return null;
   };
 
-  // 3. Request Callback
   const handleRequestCallback = async (item: ServiceItem) => {
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -211,7 +202,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
     }
   };
 
-  // 4. Submit Custom Unlisted Task
   const handleCustomTask = async () => {
     const taskText = customTask.trim();
     if (!taskText) return;
@@ -257,101 +247,6 @@ export default function Services({ onSelectService, sellerId }: Props) {
     } finally {
       setSubmittingCustom(false);
     }
-  };
-
-  const renderItem = ({ item }: { item: ServiceItem }) => {
-    const isExpanded = expandedId === item.id;
-    const imageUrl = item.image_urls && item.image_urls.length > 0 ? item.image_urls[0] : null;
-
-    return (
-      <View style={styles.card}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            toggleExpand(item.id);
-            onSelectService?.(item);
-          }}
-        >
-          {imageUrl ? (
-            <View style={styles.imageBannerContainer}>
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.heroImage}
-                resizeMode="cover"
-              />
-            </View>
-          ) : null}
-
-          <View style={styles.row}>
-            <View style={styles.nameContainer}>
-              <Text style={styles.name}>{item.name}</Text>
-            </View>
-
-            <View style={styles.rightHeaderWrap}>
-              <View style={styles.priceWrap}>
-                <Text style={styles.priceLabel}>Starting from</Text>
-                <Text style={styles.priceValue}>{formatKES(item.price)}</Text>
-              </View>
-              <Ionicons
-                name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color="#6B7280"
-                style={{ marginLeft: 8 }}
-              />
-            </View>
-          </View>
-
-          {item.description ? (
-            <View style={styles.descriptionContainer}>
-              <Text
-                style={styles.description}
-                numberOfLines={isExpanded ? undefined : 2}
-              >
-                {item.description}
-              </Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
-
-        {isExpanded && (
-          <View style={styles.expandedContainer}>
-            <TextInput
-              style={styles.formInput}
-              placeholder="Phone number for callback..."
-              placeholderTextColor="#9CA3AF"
-              keyboardType="phone-pad"
-              value={userPhone}
-              onChangeText={setUserPhone}
-            />
-
-            <TextInput
-              style={[styles.formInput, styles.textArea]}
-              placeholder="Add specific details or instructions..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={2}
-              value={notes}
-              onChangeText={setNotes}
-            />
-
-            <TouchableOpacity
-              style={styles.callbackBtn}
-              disabled={submittingAction}
-              onPress={() => handleRequestCallback(item)}
-            >
-              {submittingAction ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="call-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.btnText}>Request Callback</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
   };
 
   const renderHeader = () => (
@@ -403,79 +298,102 @@ export default function Services({ onSelectService, sellerId }: Props) {
     );
   }
 
+  const content = (
+    <View style={styles.mainWrapper}>
+      {/* Screen-Centered Toast Banner */}
+      {toast && (
+        <View style={styles.centerToastOverlay} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.toast,
+              toast.type === 'success' ? styles.toastSuccess : styles.toastError,
+              { opacity: toastOpacity },
+            ]}
+          >
+            <Ionicons
+              name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+              size={20}
+              color="#FFFFFF"
+            />
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </Animated.View>
+        </View>
+      )}
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={!!modalConfig?.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeaderIcon}>
+              <Ionicons name="help-circle-outline" size={32} color="#6B46C1" />
+            </View>
+            <Text style={styles.modalTitle}>{modalConfig?.title}</Text>
+            <Text style={styles.modalMessage}>{modalConfig?.message}</Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} activeOpacity={0.7} onPress={closeModal}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const cb = modalConfig?.onConfirm;
+                  closeModal();
+                  cb?.();
+                }}
+              >
+                <Text style={styles.modalConfirmText}>{modalConfig?.confirmText}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <FlatList
+        data={services}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <ServiceCard
+            item={item}
+            isExpanded={expandedId === item.id}
+            userPhone={userPhone}
+            notes={notes}
+            submittingAction={submittingAction}
+            onToggleExpand={() => {
+              toggleExpand(item.id);
+              onSelectService?.(item);
+            }}
+            onPhoneChange={setUserPhone}
+            onNotesChange={setNotes}
+            onRequestCallback={() => handleRequestCallback(item)}
+          />
+        )}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+      />
+    </View>
+  );
+
+  if (Platform.OS === 'web') {
+    return <View style={styles.container}>{content}</View>;
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <View style={{ flex: 1 }}>
-          {toast && (
-            <Animated.View
-              style={[
-                styles.toast,
-                toast.type === 'success' ? styles.toastSuccess : styles.toastError,
-                { opacity: toastOpacity },
-              ]}
-            >
-              <Ionicons
-                name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
-                size={18}
-                color="#FFFFFF"
-              />
-              <Text style={styles.toastText}>{toast.message}</Text>
-            </Animated.View>
-          )}
-
-          <Modal
-            visible={!!modalConfig?.visible}
-            transparent
-            animationType="fade"
-            onRequestClose={closeModal}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContainer}>
-                <View style={styles.modalHeaderIcon}>
-                  <Ionicons name="help-circle-outline" size={32} color="#6B46C1" />
-                </View>
-                <Text style={styles.modalTitle}>{modalConfig?.title}</Text>
-                <Text style={styles.modalMessage}>{modalConfig?.message}</Text>
-
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={styles.modalCancelBtn}
-                    activeOpacity={0.7}
-                    onPress={closeModal}
-                  >
-                    <Text style={styles.modalCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.modalConfirmBtn}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      const cb = modalConfig?.onConfirm;
-                      closeModal();
-                      cb?.();
-                    }}
-                  >
-                    <Text style={styles.modalConfirmText}>{modalConfig?.confirmText}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-
-          <FlatList
-            data={services}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            ListHeaderComponent={renderHeader}
-            ListFooterComponent={renderFooter}
-            contentContainerStyle={styles.listContent}
-            keyboardShouldPersistTaps="handled"
-          />
-        </View>
+        {content}
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
@@ -483,6 +401,7 @@ export default function Services({ onSelectService, sellerId }: Props) {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: '#F9FAFB', flex: 1 },
+  mainWrapper: { flex: 1, position: 'relative' },
   loaderContainer: { paddingVertical: 50, alignItems: 'center', justifyContent: 'center' },
   loaderText: { marginTop: 10, fontSize: 14, color: '#6B7280' },
   listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
@@ -492,32 +411,6 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 13, color: '#4B5563', lineHeight: 18 },
   bold: { fontWeight: '700', color: '#1F2937' },
   subheading: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' },
-
-  imageBannerContainer: {
-    width: '100%',
-    height: 180,
-    backgroundColor: '#F3F4F6',
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, paddingHorizontal: 16 },
-  nameContainer: { flex: 1, marginRight: 10 },
-  name: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
-  descriptionContainer: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 },
-  description: { fontSize: 13, color: '#4B5563', lineHeight: 19 },
-  rightHeaderWrap: { flexDirection: 'row', alignItems: 'center' },
-  priceWrap: { alignItems: 'flex-end' },
-  priceLabel: { fontSize: 10, color: '#9CA3AF' },
-  priceValue: { fontSize: 15, fontWeight: '700', color: '#6B46C1', marginTop: 1 },
-  expandedContainer: { padding: 14, backgroundColor: '#FAF5FF', borderTopWidth: 1, borderTopColor: '#F3E8FF' },
-  formInput: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9D8FD', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: '#1F2937', marginBottom: 8 },
-  textArea: { height: 52, textAlignVertical: 'top' },
-  callbackBtn: { height: 40, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6B46C1', marginTop: 4 },
-  btnText: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
   customTaskContainer: { marginTop: 16, padding: 16, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' },
   customTaskTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
   customTaskSubtitle: { fontSize: 13, color: '#6B7280', marginTop: 2, marginBottom: 12 },
@@ -526,28 +419,39 @@ const styles = StyleSheet.create({
   submitButton: { height: 44, paddingHorizontal: 16, backgroundColor: '#6B46C1', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   disabledButton: { backgroundColor: '#C4B5FD' },
   submitButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-  toast: {
+
+  // Screen-Centered Floating Warning / Toast Overlay
+  centerToastOverlay: {
     position: 'absolute',
-    top: 12,
-    left: 16,
-    right: 16,
-    zIndex: 9999,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    maxWidth: 360,
+    width: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  toastSuccess: { backgroundColor: '#16A34A' },
-  toastError: { backgroundColor: '#DC2626' },
-  toastText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', flex: 1 },
+  toastSuccess: { backgroundColor: '#15803D' },
+  toastError: { backgroundColor: '#B91C1C' },
+  toastText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'center' },
 
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
@@ -577,53 +481,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1F2937',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalMessage: {
-    fontSize: 13,
-    color: '#4B5563',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-  },
-  modalCancelBtn: {
-    flex: 1,
-    height: 42,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  modalConfirmBtn: {
-    flex: 1,
-    height: 42,
-    borderRadius: 8,
-    backgroundColor: '#6B46C1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 8 },
+  modalMessage: { fontSize: 13, color: '#4B5563', textAlign: 'center', lineHeight: 18, marginBottom: 20 },
+  modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' },
+  modalCancelBtn: { flex: 1, height: 42, borderRadius: 8, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
+  modalCancelText: { fontSize: 14, fontWeight: '600', color: '#4B5563' },
+  modalConfirmBtn: { flex: 1, height: 42, borderRadius: 8, backgroundColor: '#6B46C1', justifyContent: 'center', alignItems: 'center' },
+  modalConfirmText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
 });
 

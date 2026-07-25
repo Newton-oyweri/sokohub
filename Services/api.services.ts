@@ -10,8 +10,7 @@ export interface ServiceItem {
 }
 
 /**
- * Fetches all available products where product_category_id is 'services'.
- * Does not filter by post_type.
+ * Fetches all available products under the 'services' category, regardless of post_type.
  */
 export async function fetchAllAvailableServices(): Promise<ServiceItem[]> {
   const { data, error } = await supabase
@@ -26,7 +25,7 @@ export async function fetchAllAvailableServices(): Promise<ServiceItem[]> {
 }
 
 /**
- * Fetches the logged-in user's profile phone number.
+ * Fetches logged-in user phone number.
  */
 export async function fetchUserProfilePhone(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -43,7 +42,7 @@ export async function fetchUserProfilePhone(): Promise<string | null> {
 }
 
 /**
- * Submits a callback request for an existing service item.
+ * Submits a callback request.
  */
 export async function createCallbackRequest(params: {
   userId: string;
