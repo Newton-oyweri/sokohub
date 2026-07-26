@@ -6,14 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
-
-const { width } = Dimensions.get('window');
 
 type Category = {
   id: string;
@@ -38,6 +35,7 @@ function formatKES(amount: number) {
 
 export default function Fashion() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -45,6 +43,14 @@ export default function Fashion() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Responsive Grid Calculations
+  const GRID_PADDING = 12;
+  const GAP = 12;
+
+  // 2 columns for phones, 3 for small tablets (≥600px), 4 for large screens (≥900px)
+  const numColumns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
+  const cardWidth = (width - GRID_PADDING * 2 - GAP * (numColumns - 1)) / numColumns;
 
   // Fetch Fashion Subcategories
   const fetchCategories = async () => {
@@ -78,7 +84,6 @@ export default function Fashion() {
       if (selectedCategory !== 'all') {
         query = query.eq('category', selectedCategory);
       } else {
-        // Fetch all products that belong to any fashion subcategory
         const { data: fashionCats } = await supabase
           .from('categories')
           .select('id')
@@ -137,67 +142,28 @@ export default function Fashion() {
     });
   };
 
-  const getProductSize = (index: number) => {
-    // Create varied sizes: some large (full width), some regular (half width)
-    const pattern = index % 5;
-    if (pattern === 0 || pattern === 3) {
-      return 'large'; // Full width
-    } else {
-      return 'regular'; // Half width
-    }
-  };
-
-  const getProductDimensions = (size: string) => {
-    const padding = 8;
-    const screenWidth = width - (padding * 2);
-    
-    switch(size) {
-      case 'large':
-        return {
-          width: screenWidth,
-          height: 280,
-          marginBottom: 12,
-        };
-      case 'regular':
-      default:
-        const regularWidth = (screenWidth - 8) / 2;
-        return {
-          width: regularWidth,
-          height: 240,
-          marginBottom: 12,
-        };
-    }
-  };
-
-  const renderProductItem = ({ item, index }: { item: Product; index: number }) => {
+  const renderProductItem = (item: Product) => {
     const imageUrl = item.image_urls?.[0];
-    const size = getProductSize(index);
-    const dimensions = getProductDimensions(size);
-    const isLarge = size === 'large';
 
     return (
       <TouchableOpacity
-        style={[
-          styles.card,
-          {
-            width: dimensions.width,
-            height: dimensions.height,
-            marginBottom: dimensions.marginBottom,
-          }
-        ]}
+        key={item.id}
+        style={[styles.card, { width: cardWidth }]}
         activeOpacity={0.85}
         onPress={() => handleProductPress(item)}
       >
-        <Image
-          source={imageUrl ? { uri: imageUrl } : require('@/assets/images/icon.png')}
-          style={styles.cardImage}
-          resizeMode="cover"
-        />
+        <View style={styles.imageContainer}>
+          <Image
+            source={imageUrl ? { uri: imageUrl } : require('@/assets/images/icon.png')}
+            style={styles.cardImage}
+            resizeMode="contain" // Guarantees full product image is visible without cropping
+          />
+        </View>
         <View style={styles.cardContent}>
-          <Text style={[styles.cardName, isLarge && styles.cardNameLarge]} numberOfLines={2}>
+          <Text style={styles.cardName} numberOfLines={2}>
             {item.name}
           </Text>
-          <Text style={[styles.cardPrice, isLarge && styles.cardPriceLarge]}>
+          <Text style={styles.cardPrice}>
             {formatKES(item.price)}
           </Text>
         </View>
@@ -234,18 +200,14 @@ export default function Fashion() {
     }
 
     return (
-      <View style={styles.gridContainer}>
-        {products.map((item, index) => (
-          <View key={item.id} style={styles.gridItem}>
-            {renderProductItem({ item, index })}
-          </View>
-        ))}
+      <View style={[styles.gridContainer, { paddingHorizontal: GRID_PADDING, gap: GAP }]}>
+        {products.map(renderProductItem)}
       </View>
     );
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.contentContainer}
@@ -258,8 +220,8 @@ export default function Fashion() {
 
       {/* Categories - Horizontal Scroll */}
       <View style={styles.categoriesWrapper}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesScrollContent}
         >
@@ -342,10 +304,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    marginBottom: 12,
   },
   categoriesScrollContent: {
     paddingHorizontal: 16,
-    gap: 8,
   },
   categoryChip: {
     paddingHorizontal: 18,
@@ -366,48 +328,46 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   gridContainer: {
-    paddingHorizontal: 8,
-    paddingTop: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  gridItem: {
-    // No extra styles - just container for the card
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  imageContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#F8F9FA',
   },
   cardImage: {
     width: '100%',
-    height: '75%',
-    backgroundColor: '#F3F4F6',
+    height: '100%',
   },
   cardContent: {
     padding: 10,
-    height: '25%',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   cardName: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 2,
-  },
-  cardNameLarge: {
-    fontSize: 14,
+    lineHeight: 18,
+    minHeight: 36,
   },
   cardPrice: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: '#6b46c1',
-  },
-  cardPriceLarge: {
-    fontSize: 16,
+    marginTop: 4,
   },
   centerContainer: {
     justifyContent: 'center',
@@ -438,3 +398,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

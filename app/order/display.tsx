@@ -7,10 +7,12 @@ import {
   StyleSheet,
   Dimensions,
   FlatList,
-  TouchableOpacity,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const { width: windowWidth } = Dimensions.get('window');
 
 interface ProductDisplayProps {
   product: {
@@ -25,24 +27,42 @@ interface ProductDisplayProps {
 
 export default function ProductDisplay({ product }: ProductDisplayProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(windowWidth);
   const flatListRef = useRef<FlatList>(null);
 
   // Get image array or fallback
-  const images = product.image_urls && product.image_urls.length > 0 
-    ? product.image_urls 
-    : ['https://via.placeholder.com/400x300/6b46c1/ffffff?text=No+Image'];
+  const images =
+    product.image_urls && product.image_urls.length > 0
+      ? product.image_urls
+      : ['https://via.placeholder.com/400x300/6b46c1/ffffff?text=No+Image'];
 
-  const handleScroll = (event: any) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / width);
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    if (width > 0 && width !== containerWidth) {
+      setContainerWidth(width);
+    }
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (containerWidth <= 0) return;
+    const index = Math.round(
+      event.nativeEvent.contentOffset.x / containerWidth
+    );
     setActiveIndex(index);
   };
 
-  const renderImage = ({ item, index }: { item: string; index: number }) => (
-    <View style={styles.imageSlide}>
-      <Image 
-        source={{ uri: item }} 
-        style={styles.cakeImage} 
-        resizeMode="cover"
+  const getItemLayout = (_: any, index: number) => ({
+    length: containerWidth,
+    offset: containerWidth * index,
+    index,
+  });
+
+  const renderImage = ({ item }: { item: string }) => (
+    <View style={[styles.imageSlide, { width: containerWidth }]}>
+      <Image
+        source={{ uri: item }}
+        style={styles.cakeImage}
+        resizeMode="contain"
       />
     </View>
   );
@@ -50,7 +70,7 @@ export default function ProductDisplay({ product }: ProductDisplayProps) {
   return (
     <View style={styles.container}>
       {/* Image Carousel */}
-      <View style={styles.carouselContainer}>
+      <View style={styles.carouselContainer} onLayout={handleContainerLayout}>
         <FlatList
           ref={flatListRef}
           data={images}
@@ -61,6 +81,7 @@ export default function ProductDisplay({ product }: ProductDisplayProps) {
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          getItemLayout={getItemLayout}
         />
 
         {/* Dot Indicators */}
@@ -94,7 +115,9 @@ export default function ProductDisplay({ product }: ProductDisplayProps) {
         <Text style={styles.productDescription}>
           {product.description || 'No description available.'}
         </Text>
-        <Text style={styles.productPrice}>KSh {Number(product.price).toLocaleString()}</Text>
+        <Text style={styles.productPrice}>
+          KSh {Number(product.price).toLocaleString()}
+        </Text>
       </View>
     </View>
   );
@@ -118,36 +141,13 @@ const styles = StyleSheet.create({
     height: 280,
   },
   imageSlide: {
-    width: width - 40, // Account for padding
     height: 280,
     position: 'relative',
+    backgroundColor: '#f8f9fa', // Neutral backdrop for "contain" images
   },
   cakeImage: {
     width: '100%',
     height: '100%',
-  },
-  badge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  pinnedBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-  },
-  bookingBadge: {
-    backgroundColor: 'rgba(107, 70, 193, 0.9)',
-  },
-  saleBadge: {
-    backgroundColor: 'rgba(34, 197, 94, 0.9)',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   dotContainer: {
     position: 'absolute',
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   activeDot: {
     backgroundColor: '#6b46c1',
@@ -203,3 +203,4 @@ const styles = StyleSheet.create({
     color: '#6b46c1',
   },
 });
+
