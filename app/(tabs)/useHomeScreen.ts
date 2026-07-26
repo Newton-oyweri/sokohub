@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { Animated, BackHandler } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
@@ -22,10 +22,7 @@ export function useHomeScreen() {
     tab === 'account' ? 'account' : 'cakes'
   );
 
-  // Active category within the Shop tab. Defaults to Bakery since
-  // that's the only category with real content right now.
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('bakery');
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('Guest User');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -38,9 +35,12 @@ export function useHomeScreen() {
   const handleShopPress = () => setActiveTab('cakes');
   const handleAccountPress = () => setActiveTab('account');
   const handleCategoryPress = (key: CategoryKey) => setActiveCategory(key);
+  
+  // Navigation trigger for search input tap
+  const handleSearchPress = () => {
+    router.push('/search');
+  };
 
-  // --- Smart hardware back button ---
-  // On Account tab: back returns to Shop instead of leaving the screen/app.
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -55,7 +55,6 @@ export function useHomeScreen() {
     }, [activeTab])
   );
 
-  // --- Profile fetch ---
   const fetchProfileDetails = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -75,7 +74,6 @@ export function useHomeScreen() {
     }
   }, []);
 
-  // --- Unread count fetch ---
   const fetchUnreadCount = useCallback(async (userId: string) => {
     try {
       const { count, error } = await supabase
@@ -92,7 +90,6 @@ export function useHomeScreen() {
     }
   }, []);
 
-  // --- Auth lifecycle ---
   useEffect(() => {
     const checkUserSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -123,7 +120,6 @@ export function useHomeScreen() {
     };
   }, [fetchProfileDetails, fetchUnreadCount]);
 
-  // --- Realtime notifications subscription ---
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -152,7 +148,6 @@ export function useHomeScreen() {
     };
   }, [isLoggedIn, fetchUnreadCount]);
 
-  // --- Bell shake animation ---
   useEffect(() => {
     const triggerBellShake = () => {
       shakeAnimation.setValue(0);
@@ -208,5 +203,7 @@ export function useHomeScreen() {
     bellRotation,
     greetingOpacity,
     scrollY,
+    handleSearchPress,
   };
 }
+

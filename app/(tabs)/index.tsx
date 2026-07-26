@@ -49,6 +49,7 @@ export default function App() {
     bellRotation,
     greetingOpacity,
     scrollY,
+    handleSearchPress,
   } = useHomeScreen();
 
   const isPWA = useIsPWA();
@@ -72,12 +73,23 @@ export default function App() {
           )}
           scrollEventThrottle={16}
         >
+          {/* Transparent Search Bar overlay on top banner */}
           <Animated.View
-            style={[styles.greetingSpacer, { height: HEADER_HEIGHT - 60, opacity: greetingOpacity }]}
+            style={[
+              styles.greetingSpacer,
+              { height: HEADER_HEIGHT - 40, opacity: greetingOpacity },
+            ]}
           >
-            <Text style={styles.welcomeText}>
-              Welcome, <Text style={styles.highlightText}>{userName}</Text> 👋
-            </Text>
+            <TouchableOpacity
+              style={styles.transparentSearchBar}
+              activeOpacity={0.85}
+              onPress={handleSearchPress}
+            >
+              <Ionicons name="search-outline" size={20} color="#6b46c1" />
+              <Text style={styles.searchPlaceholderText} numberOfLines={1}>
+                Welcome <Text style={styles.highlightName}>{userName}</Text>, what are you looking for today?
+              </Text>
+            </TouchableOpacity>
           </Animated.View>
 
           <View style={styles.stickyTabsWrapper}>
@@ -166,16 +178,32 @@ const styles = StyleSheet.create({
   },
   greetingSpacer: {
     justifyContent: 'flex-end',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  welcomeText: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#1f2937',
-    letterSpacing: -0.5,
+  transparentSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.65)',
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+    shadowColor: '#6b46c1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  highlightText: {
+  searchPlaceholderText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#4B5563',
+  },
+  highlightName: {
     color: '#6b46c1',
     fontWeight: '700',
   },
@@ -183,7 +211,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingTop: 30,
+    paddingTop: 16,
     paddingBottom: 12,
     shadowColor: '#6b46c1',
     shadowOffset: { width: 0, height: -4 },
