@@ -109,7 +109,7 @@ export default function ConfirmOrder({
       notes: {
         customWriting: customWriting?.trim() || null,
         fulfillmentMethod: fulfillmentMethod,
-        deliveryAddress: fulfillmentMethod === 'door_delivery' ? deliveryAddress : 'Bungoma, Kibabii (Opposite Main Gate)',
+        deliveryAddress: deliveryAddress || 'Location not set',
         productName: product.name,
         orderedAt: new Date().toISOString(),
       },
@@ -230,7 +230,7 @@ export default function ConfirmOrder({
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Location</Text>
                   <Text style={styles.summaryValue} numberOfLines={2}>
-                    {fulfillmentMethod === 'door_delivery' ? deliveryAddress : 'Bungoma, Kibabii (Opposite Main Gate)'}
+                    {deliveryAddress || 'Location not set'}
                   </Text>
                 </View>
 
@@ -540,4 +540,3 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
 });
-
