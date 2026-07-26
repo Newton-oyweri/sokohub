@@ -82,8 +82,11 @@ export default function OrderScreen() {
 
   const [quantity, setQuantity] = useState(1);
   const [customWriting, setCustomWriting] = useState('');
-  const [selectedSize, setSelectedSize] = useState('L');
-  const [selectedColor, setSelectedColor] = useState('Khaki');
+  
+  // Blank defaults until selected by user
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  
   const [selectedLocation, setSelectedLocation] = useState<ActiveLocation | null>(null);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -100,11 +103,10 @@ export default function OrderScreen() {
     }, [])
   );
 
-  // Fetch product from database
   useEffect(() => {
     const fetchProduct = async () => {
       const productId = params.id as string;
-      
+
       if (!productId) {
         setError('No product ID provided');
         setLoading(false);
@@ -129,7 +131,6 @@ export default function OrderScreen() {
           throw new Error('Product not found');
         }
 
-        // Parse image_urls if it's a string
         let imageUrls: string[] = [];
         if (data.image_urls) {
           if (typeof data.image_urls === 'string') {
@@ -168,11 +169,10 @@ export default function OrderScreen() {
     fetchProduct();
   }, [params.id]);
 
-  // Check if product is fashion
+  // Strict check for fashion category
   const isFashion = useMemo(() => {
     if (!product) return false;
-    return product.product_category_id?.toLowerCase() === 'fashion' ||
-           product.category?.toLowerCase() === 'fashion';
+    return product.product_category_id?.toLowerCase() === 'fashion';
   }, [product]);
 
   const customerId = typeof params.customerId === 'string'
@@ -215,16 +215,15 @@ export default function OrderScreen() {
     });
   };
 
-  // Build full order note combining size, color & custom message for checkout flow
+  // Build final note strictly using chosen selections
   const finalOrderNote = [
-    isFashion ? `Size: ${selectedSize}` : null,
-    isFashion ? `Color: ${selectedColor}` : null,
-    customWriting ? `Note: ${customWriting}` : null,
+    isFashion && selectedSize ? `Size: ${selectedSize}` : null,
+    isFashion && selectedColor ? `Color: ${selectedColor}` : null,
+    customWriting ? `Note: ${customWriting.trim()}` : null,
   ]
     .filter(Boolean)
     .join(' | ');
 
-  // Loading state
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -234,14 +233,13 @@ export default function OrderScreen() {
     );
   }
 
-  // Error state
   if (error || !product) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Ionicons name="alert-circle-outline" size={64} color="#94a3b8" />
         <Text style={styles.errorText}>{error || 'Product not found'}</Text>
-        <TouchableOpacity 
-          style={styles.errorButton} 
+        <TouchableOpacity
+          style={styles.errorButton}
           onPress={() => router.back()}
         >
           <Text style={styles.errorButtonText}>Go Back</Text>
@@ -261,7 +259,6 @@ export default function OrderScreen() {
       >
         <ProductDisplay product={product} />
 
-        {/* Fashion Category Options & Size Guides Dropdown - ONLY shows for fashion */}
         {isFashion && (
           <SizeGuideSelector
             categoryId={product.category}
@@ -273,13 +270,11 @@ export default function OrderScreen() {
           />
         )}
 
-        {/* Location Selection Component */}
         <LocationSelector
           key={locationRefreshKey}
           onLocationFetched={(loc) => setSelectedLocation(loc)}
         />
 
-        {/* Custom Message */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Custom Instructions</Text>
           <Text style={styles.sectionSubtitle}>Anything else you'd like us to know? (Optional)</Text>
@@ -294,7 +289,6 @@ export default function OrderScreen() {
           <Text style={styles.charCount}>{customWriting.length}/50</Text>
         </View>
 
-        {/* Quantity Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quantity</Text>
           <View style={styles.counterContainer}>
@@ -308,7 +302,6 @@ export default function OrderScreen() {
           </View>
         </View>
 
-        {/* Delivery Coverage Banner */}
         <View style={styles.deliveryBanner}>
           <Ionicons name="bicycle-outline" size={22} color="#6b46c1" />
           <Text style={styles.deliveryBannerText}>
@@ -316,7 +309,6 @@ export default function OrderScreen() {
           </Text>
         </View>
 
-        {/* Selected Location Summary Block */}
         <View style={[styles.deliveryBox, { marginTop: 16 }]}>
           <View style={styles.deliveryRow}>
             <View style={styles.deliveryIconRow}>
@@ -342,7 +334,6 @@ export default function OrderScreen() {
           </View>
         </View>
 
-        {/* Bill Summary */}
         <View style={styles.billingSection}>
           <Text style={styles.sectionTitle}>Payment Summary</Text>
           <View style={styles.billRow}>
@@ -362,7 +353,6 @@ export default function OrderScreen() {
         </View>
       </ScrollView>
 
-      {/* Footer System Panel */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity
           style={styles.checkoutButton}
@@ -405,8 +395,8 @@ export default function OrderScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f4ff' },
-  centerContent: { 
-    justifyContent: 'center', 
+  centerContent: {
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
@@ -543,3 +533,4 @@ const styles = StyleSheet.create({
   },
   modalButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
+

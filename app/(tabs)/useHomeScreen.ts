@@ -8,14 +8,12 @@ export type CategoryKey =
   | 'flowers'
   | 'groceries'
   | 'fashion'
-  | 'electronics'
-  | 'services';
+  | 'electronics';
 
-export const CATEGORIES: { key: CategoryKey; label: string; icon: string }[] = [
+export const CATEGORIES: { key: CategoryKey; label: string }[] = [
   { key: 'bakery', label: 'Cakes & Bakery'},
   { key: 'fashion', label: 'Fashion'},
   { key: 'electronics', label: 'Electronics'},
-  { key: 'services', label: 'Services'},
 ];
 
 export function useHomeScreen() {

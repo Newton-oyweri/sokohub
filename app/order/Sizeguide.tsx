@@ -68,7 +68,7 @@ export default function SizeGuideSelector({
   onSelectColor,
 }: SizeGuideSelectorProps) {
   const [activeGuide, setActiveGuide] = useState<GuideType | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false); // Start closed
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const initialSizeType: SizeType =
     categoryId?.toLowerCase().includes('shoe') ||
@@ -78,12 +78,8 @@ export default function SizeGuideSelector({
 
   const [selectedSizeType, setSelectedSizeType] = useState<SizeType>(initialSizeType);
 
-  // Check if product belongs to fashion
-  const isFashion =
-    productCategoryId?.toLowerCase() === 'fashion' ||
-    categoryId?.toLowerCase().includes('fashion') ||
-    categoryId?.toLowerCase().includes('cloth') ||
-    categoryId?.toLowerCase().includes('shoe');
+  // Strictly check for fashion category
+  const isFashion = productCategoryId?.toLowerCase() === 'fashion';
 
   if (!isFashion) return null;
 
@@ -95,8 +91,6 @@ export default function SizeGuideSelector({
   const handleSizeTypeChange = (type: SizeType) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedSizeType(type);
-    // Reset to default size for the selected category type
-    onSelectSize(type === 'shoe' ? SHOE_SIZES[2] : CLOTH_SIZES[3]);
   };
 
   const availableSizes = selectedSizeType === 'shoe' ? SHOE_SIZES : CLOTH_SIZES;
@@ -108,7 +102,6 @@ export default function SizeGuideSelector({
 
   return (
     <View style={styles.container}>
-      {/* Header with prompt and expand/collapse button */}
       <TouchableOpacity
         style={styles.headerContainer}
         onPress={toggleExpand}
@@ -127,10 +120,8 @@ export default function SizeGuideSelector({
         />
       </TouchableOpacity>
 
-      {/* Collapsible Content - Only shown when expanded */}
       {isExpanded && (
         <View style={styles.contentContainer}>
-          {/* 1. Size Type Toggle (Clothing vs Shoes) */}
           <View style={styles.sizeTypeToggleRow}>
             <TouchableOpacity
               style={[
@@ -179,7 +170,6 @@ export default function SizeGuideSelector({
             </TouchableOpacity>
           </View>
 
-          {/* 2. Size Values Selector */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>
               Select Size {selectedSize ? `· ${selectedSize}` : ''}
@@ -208,7 +198,6 @@ export default function SizeGuideSelector({
             })}
           </View>
 
-          {/* 3. Color Selection with Color Pills & Labels */}
           <Text style={[styles.sectionTitle, { marginTop: 18 }]}>
             Select Color {selectedColor ? `· ${selectedColor}` : ''}
           </Text>
@@ -257,7 +246,6 @@ export default function SizeGuideSelector({
             })}
           </View>
 
-          {/* 4. Expandable Size Chart Accordion Triggers */}
           <View style={styles.tabContainer}>
             <TouchableOpacity
               style={[styles.tabButton, activeGuide === 'cloth' && styles.activeTab]}
@@ -310,7 +298,6 @@ export default function SizeGuideSelector({
             </TouchableOpacity>
           </View>
 
-          {/* 5. Expanded Image View */}
           {activeGuide && (
             <View style={styles.imageCard}>
               <Text style={styles.imageTitle}>{SIZE_GUIDES[activeGuide].title}</Text>
@@ -515,3 +502,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 });
+
