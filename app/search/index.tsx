@@ -12,11 +12,13 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 0;
+const RECENT_SEARCHES_KEY = '@sokohub_recent_searches';
 
 export type Product = {
   id: string;
@@ -39,8 +41,6 @@ const CATEGORIES = [
   { id: 'bakery', label: 'Cakes & Bakery', icon: 'cafe-outline' },
   { id: 'fashion', label: 'Fashion', icon: 'shirt-outline' },
   { id: 'electronics', label: 'Electronics', icon: 'hardware-chip-outline' },
-  { id: 'games', label: 'Games', icon: 'game-controller-outline' },
-  { id: 'books', label: 'Books', icon: 'book-outline' },
 ];
 
 export default function SearchScreen() {
@@ -48,21 +48,62 @@ export default function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    'Chocolate Cake',
-    'Headphones',
-    'Airpods',
-  ]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [results, setResults] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Focus input automatically on navigation
+  // Load stored recent searches from AsyncStorage on mount
   useEffect(() => {
+    loadRecentSearches();
+
     const timer = setTimeout(() => {
       inputRef.current?.focus();
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  const loadRecentSearches = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error('Failed to load recent searches:', err);
+    }
+  };
+
+  const saveRecentSearch = async (term: string) => {
+    const cleanTerm = term.trim();
+    if (!cleanTerm) return;
+
+    try {
+      const updated = [cleanTerm, ...recentSearches.filter((item) => item !== cleanTerm)].slice(0, 5);
+      setRecentSearches(updated);
+      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to save recent search:', err);
+    }
+  };
+
+  const clearAllRecentSearches = async () => {
+    try {
+      setRecentSearches([]);
+      await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+    } catch (err) {
+      console.error('Failed to clear recent searches:', err);
+    }
+  };
+
+  const handleRemoveRecent = async (term: string) => {
+    try {
+      const updated = recentSearches.filter((item) => item !== term);
+      setRecentSearches(updated);
+      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to remove recent search:', err);
+    }
+  };
 
   // Debounced multi-field search logic
   useEffect(() => {
@@ -83,10 +124,8 @@ export default function SearchScreen() {
     try {
       setLoading(true);
 
-      // Clean input string for query safety
       const sanitized = queryText.replace(/[%_]/g, '\\$&');
 
-      // Robust search: Matches either product name OR description
       const { data, error } = await supabase
         .from('products')
         .select(
@@ -117,15 +156,9 @@ export default function SearchScreen() {
     inputRef.current?.focus();
   };
 
-  const handleRemoveRecent = (term: string) => {
-    setRecentSearches((prev) => prev.filter((item) => item !== term));
-  };
-
-  // Route to /order passing all detailed product parameters
   const handleProductPress = (item: Product) => {
-    // Keep recent search items list updated
-    if (searchQuery.trim() && !recentSearches.includes(searchQuery.trim())) {
-      setRecentSearches((prev) => [searchQuery.trim(), ...prev.slice(0, 4)]);
+    if (searchQuery.trim()) {
+      saveRecentSearch(searchQuery.trim());
     }
 
     router.push({
@@ -183,7 +216,7 @@ export default function SearchScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: STATUS_BAR_HEIGHT }]}>
-      {/* Top Header & Search Bar */}
+      {/* Header & Search Bar */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
@@ -199,6 +232,7 @@ export default function SearchScreen() {
             placeholder="Search by name, brand, or details..."
             placeholderTextColor="#9CA3AF"
             returnKeyType="search"
+            onSubmitEditing={() => saveRecentSearch(searchQuery)}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={handleClearQuery}>
@@ -208,7 +242,7 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      {/* Main Content View */}
+      {/* Main Content Area */}
       {searchQuery.trim().length > 0 ? (
         <View style={styles.resultsContainer}>
           {loading ? (
@@ -235,12 +269,12 @@ export default function SearchScreen() {
         </View>
       ) : (
         <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
-          {/* Recent Searches Section */}
+          {/* Real Recent Searches */}
           {recentSearches.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Searches</Text>
-                <TouchableOpacity onPress={() => setRecentSearches([])}>
+                <TouchableOpacity onPress={clearAllRecentSearches}>
                   <Text style={styles.clearText}>Clear All</Text>
                 </TouchableOpacity>
               </View>
@@ -260,7 +294,7 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {/* Popular Categories */}
+          {/* Clean Popular Categories */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Popular Categories</Text>
             <View style={styles.categoriesGrid}>
@@ -310,13 +344,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'transparent', // Prevents border appearance changes
   },
   input: {
     flex: 1,
     fontSize: 15,
     color: '#1F2937',
     paddingVertical: Platform.OS === 'ios' ? 4 : 0,
-  },
+    borderWidth: 0,
+    // Removes active default focus rings on Web & Android
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+  } as any,
   content: {
     flex: 1,
     paddingHorizontal: 20,
@@ -360,12 +399,12 @@ const styles = StyleSheet.create({
   },
   categoriesGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
     marginTop: 12,
   },
   categoryCard: {
-    width: '30%',
+    flex: 1,
     alignItems: 'center',
     backgroundColor: '#F8F4FF',
     paddingVertical: 16,
