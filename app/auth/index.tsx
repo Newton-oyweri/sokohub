@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +16,8 @@ import { supabase } from '../../lib/supabase';
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { redirectTo } = useLocalSearchParams<{ redirectTo?: string }>();
+
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,9 +25,23 @@ export default function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Dynamic inline error and success feedback state
+  const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+
   // Track which field is focused so we can swap the border color instead of
   // showing the browser's default black/blue outline on web.
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  // Helper function to safely send the user back to where they came from
+  const navigateBackOrHome = () => {
+    if (redirectTo) {
+      router.replace(redirectTo as any);
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
 
   const validateFields = (): string | null => {
     if (!email || !password) return 'Please fill in all fields';
@@ -39,9 +54,10 @@ export default function AuthScreen() {
   };
 
   const handleAuth = async () => {
+    setMessage(null);
     const error = validateFields();
     if (error) {
-      Alert.alert('Error', error);
+      setMessage({ type: 'error', text: error });
       return;
     }
 
@@ -63,18 +79,22 @@ export default function AuthScreen() {
       if (result.error) throw result.error;
 
       if (result.data.user) {
-        router.back();
+        navigateBackOrHome();
       }
     } catch (error: any) {
-      Alert.alert(isLogin ? 'Login Failed' : 'Sign Up Failed', error.message);
+      setMessage({
+        type: 'error',
+        text: error.message || (isLogin ? 'Login Failed' : 'Sign Up Failed'),
+      });
     } finally {
       setLoading(false);
     }
   };
 
-    const handleForgotPassword = async () => {
+  const handleForgotPassword = async () => {
+    setMessage(null);
     if (!email.trim()) {
-      alert('Please enter your email address');
+      setMessage({ type: 'error', text: 'Please enter your email address' });
       return;
     }
 
@@ -89,9 +109,15 @@ export default function AuthScreen() {
 
       if (error) throw error;
 
-      alert('Reset Email Sent! Please check your email (including spam folder) for the reset link.');
+      setMessage({
+        type: 'success',
+        text: 'Reset Email Sent! Please check your email (including spam folder) for the reset link.',
+      });
     } catch (error: any) {
-      alert(`Error: ${error.message || 'Failed to send reset email'}`);
+      setMessage({
+        type: 'error',
+        text: error.message || 'Failed to send reset email',
+      });
     } finally {
       setLoading(false);
     }
@@ -103,6 +129,7 @@ export default function AuthScreen() {
     setPassword('');
     setConfirmPassword('');
     setShowPassword(false);
+    setMessage(null);
   };
 
   // Helper to combine the base input style with a focus-state border color,
@@ -199,6 +226,34 @@ export default function AuthScreen() {
               >
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
+            )}
+
+            {message && (
+              <View
+                style={[
+                  styles.messageBox,
+                  message.type === 'error' ? styles.errorBox : styles.successBox,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    message.type === 'error'
+                      ? 'alert-circle-outline'
+                      : 'checkmark-circle-outline'
+                  }
+                  size={20}
+                  color={message.type === 'error' ? '#dc2626' : '#16a34a'}
+                  style={styles.messageIcon}
+                />
+                <Text
+                  style={[
+                    styles.messageText,
+                    message.type === 'error' ? styles.errorText : styles.successText,
+                  ]}
+                >
+                  {message.text}
+                </Text>
+              </View>
             )}
 
             <TouchableOpacity
@@ -304,12 +359,42 @@ const styles = StyleSheet.create({
   },
   forgotPasswordContainer: {
     alignSelf: 'flex-end',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   forgotPasswordText: {
     color: '#6b46c1',
     fontSize: 14,
     fontWeight: '500',
+  },
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorBox: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+  },
+  successBox: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+    borderWidth: 1,
+  },
+  messageIcon: {
+    marginRight: 8,
+  },
+  messageText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  errorText: {
+    color: '#991b1b',
+  },
+  successText: {
+    color: '#166534',
   },
   submitButton: {
     backgroundColor: '#6b46c1',
@@ -342,3 +427,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
