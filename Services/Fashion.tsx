@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   ScrollView,
   FlatList,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -45,13 +46,12 @@ export default function Fashion() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Responsive Grid Calculations
-  const GRID_PADDING = 12;
+  const isWeb = Platform.OS === 'web';
   const GAP = 12;
+  const GRID_PADDING = 12;
 
-  // 2 columns for phones, 3 for small tablets (≥600px), 4 for large screens (≥900px)
-  const numColumns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
-  const cardWidth = (width - GRID_PADDING * 2 - GAP * (numColumns - 1)) / numColumns;
+  // STRICT 2 COLUMNS ON MOBILE
+  const mobileCardWidth = (width - GRID_PADDING * 2 - GAP) / 2;
 
   // Fetch Fashion Subcategories
   const fetchCategories = async () => {
@@ -143,12 +143,17 @@ export default function Fashion() {
     });
   };
 
-  const renderProductItem = ({ item }: { item: Product }) => {
+  // Render Card Component
+  const renderCard = (item: Product) => {
     const imageUrl = item.image_urls?.[0];
 
     return (
       <TouchableOpacity
-        style={[styles.card, { width: cardWidth }]}
+        key={item.id}
+        style={[
+          styles.card,
+          isWeb ? styles.webCard : { width: mobileCardWidth },
+        ]}
         activeOpacity={0.85}
         onPress={() => handleProductPress(item)}
       >
@@ -257,13 +262,29 @@ export default function Fashion() {
     );
   };
 
+  // --- WEB AUTO LAYOUT ---
+  if (isWeb) {
+    return (
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {renderHeader()}
+        {loading || error ? (
+          renderEmptyState()
+        ) : (
+          <View style={styles.webGridContainer}>
+            {products.map((item) => renderCard(item))}
+          </View>
+        )}
+      </ScrollView>
+    );
+  }
+
+  // --- MOBILE STRICT 2 COLUMNS ---
   return (
     <FlatList
-      key={`grid-${numColumns}`}
       data={loading || error ? [] : products}
       keyExtractor={(item) => item.id}
-      numColumns={numColumns}
-      renderItem={renderProductItem}
+      numColumns={2}
+      renderItem={({ item }) => renderCard(item)}
       ListHeaderComponent={renderHeader}
       ListEmptyComponent={renderEmptyState}
       contentContainerStyle={styles.contentContainer}
@@ -278,6 +299,10 @@ export default function Fashion() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
   contentContainer: {
     paddingBottom: 60,
     backgroundColor: '#F9FAFB',
@@ -328,6 +353,22 @@ const styles = StyleSheet.create({
   activeCategoryChipText: {
     color: '#FFFFFF',
   },
+  // WEB SPECIFIC GRID
+  webGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 60,
+    justifyContent: 'flex-start',
+  },
+  webCard: {
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: 180, // Auto-scales: adds columns as screen gets wider
+    maxWidth: 280, // Prevents cards from stretching too huge on wide monitors
+  },
+  // BASE CARD
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
