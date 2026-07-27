@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -142,12 +143,11 @@ export default function Fashion() {
     });
   };
 
-  const renderProductItem = (item: Product) => {
+  const renderProductItem = ({ item }: { item: Product }) => {
     const imageUrl = item.image_urls?.[0];
 
     return (
       <TouchableOpacity
-        key={item.id}
         style={[styles.card, { width: cardWidth }]}
         activeOpacity={0.85}
         onPress={() => handleProductPress(item)}
@@ -156,7 +156,7 @@ export default function Fashion() {
           <Image
             source={imageUrl ? { uri: imageUrl } : require('@/assets/images/icon.png')}
             style={styles.cardImage}
-            resizeMode="contain" // Guarantees full product image is visible without cropping
+            resizeMode="cover"
           />
         </View>
         <View style={styles.cardContent}>
@@ -171,47 +171,8 @@ export default function Fashion() {
     );
   };
 
-  const renderProductGrid = () => {
-    if (loading) {
-      return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#6b46c1" />
-        </View>
-      );
-    }
-
-    if (error) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={fetchProducts} style={styles.retryButton}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (products.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No items found in this category.</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={[styles.gridContainer, { paddingHorizontal: GRID_PADDING, gap: GAP }]}>
-        {products.map(renderProductItem)}
-      </View>
-    );
-  };
-
-  return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.contentContainer}
-    >
+  const renderHeader = () => (
+    <View>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.heading}>Fashion & Apparel</Text>
@@ -266,20 +227,60 @@ export default function Fashion() {
           })}
         </ScrollView>
       </View>
+    </View>
+  );
 
-      {/* Products Grid */}
-      {renderProductGrid()}
-    </ScrollView>
+  const renderEmptyState = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#6b46c1" />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={fetchProducts} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>No items found in this category.</Text>
+      </View>
+    );
+  };
+
+  return (
+    <FlatList
+      key={`grid-${numColumns}`}
+      data={loading || error ? [] : products}
+      keyExtractor={(item) => item.id}
+      numColumns={numColumns}
+      renderItem={renderProductItem}
+      ListHeaderComponent={renderHeader}
+      ListEmptyComponent={renderEmptyState}
+      contentContainerStyle={styles.contentContainer}
+      columnWrapperStyle={
+        products.length > 0
+          ? { gap: GAP, marginBottom: GAP, paddingHorizontal: GRID_PADDING }
+          : undefined
+      }
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
   contentContainer: {
     paddingBottom: 60,
+    backgroundColor: '#F9FAFB',
   },
   header: {
     paddingHorizontal: 16,
@@ -326,10 +327,6 @@ const styles = StyleSheet.create({
   },
   activeCategoryChipText: {
     color: '#FFFFFF',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
   },
   card: {
     backgroundColor: '#FFFFFF',

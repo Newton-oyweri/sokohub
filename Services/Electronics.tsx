@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   ScrollView,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -44,11 +45,11 @@ export default function Electronics() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Responsive Grid Logic
+  // Responsive Grid Calculations
   const GRID_PADDING = 12;
   const GAP = 12;
 
-  // Determine column count based on screen width
+  // 4 columns for large desktop, 3 for tablet, 2 for mobile phones
   const numColumns = width >= 900 ? 4 : width >= 600 ? 3 : 2;
   const cardWidth = (width - GRID_PADDING * 2 - GAP * (numColumns - 1)) / numColumns;
 
@@ -141,77 +142,37 @@ export default function Electronics() {
       },
     });
   };
-const renderProductItem = (item: Product) => {
-  const imageUrl = item.image_urls?.[0];
 
-  return (
-    <TouchableOpacity
-      key={item.id}
-      style={[styles.card, { width: cardWidth }]}
-      activeOpacity={0.85}
-      onPress={() => handleProductPress(item)}
-    >
-      <View style={styles.imageContainer}>
-        <Image
-          source={imageUrl ? { uri: imageUrl } : require('@/assets/images/icon.png')}
-          style={styles.cardImage}
-          resizeMode="contain" // <-- Change 'cover' to 'contain' here!
-        />
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardName} numberOfLines={2}>
-          {item.name}
-        </Text>
-        <Text style={styles.cardPrice}>
-          {formatKES(item.price)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-
-  const renderProductGrid = () => {
-    if (loading) {
-      return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#6b46c1" />
-        </View>
-      );
-    }
-
-    if (error) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={fetchProducts} style={styles.retryButton}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (products.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No items found in this category.</Text>
-        </View>
-      );
-    }
+  const renderProductItem = ({ item }: { item: Product }) => {
+    const imageUrl = item.image_urls?.[0];
 
     return (
-      <View style={[styles.gridContainer, { paddingHorizontal: GRID_PADDING, gap: GAP }]}>
-        {products.map(renderProductItem)}
-      </View>
+      <TouchableOpacity
+        style={[styles.card, { width: cardWidth }]}
+        activeOpacity={0.85}
+        onPress={() => handleProductPress(item)}
+      >
+        <View style={styles.imageContainer}>
+          <Image
+            source={imageUrl ? { uri: imageUrl } : require('@/assets/images/icon.png')}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardName} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <Text style={styles.cardPrice}>
+            {formatKES(item.price)}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
-  return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.contentContainer}
-    >
+  const renderHeader = () => (
+    <View>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.heading}>Electronics & Tech</Text>
@@ -266,20 +227,60 @@ const renderProductItem = (item: Product) => {
           })}
         </ScrollView>
       </View>
+    </View>
+  );
 
-      {/* Products Grid */}
-      {renderProductGrid()}
-    </ScrollView>
+  const renderEmptyState = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#6b46c1" />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={fetchProducts} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>No items found in this category.</Text>
+      </View>
+    );
+  };
+
+  return (
+    <FlatList
+      key={`grid-${numColumns}`} // Force recreation of grid layout when switching column counts
+      data={loading || error ? [] : products}
+      keyExtractor={(item) => item.id}
+      numColumns={numColumns}
+      renderItem={renderProductItem}
+      ListHeaderComponent={renderHeader}
+      ListEmptyComponent={renderEmptyState}
+      contentContainerStyle={styles.contentContainer}
+      columnWrapperStyle={
+        products.length > 0
+          ? { gap: GAP, marginBottom: GAP, paddingHorizontal: GRID_PADDING }
+          : undefined
+      }
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
   contentContainer: {
     paddingBottom: 60,
+    backgroundColor: '#F9FAFB',
   },
   header: {
     paddingHorizontal: 16,
@@ -327,10 +328,6 @@ const styles = StyleSheet.create({
   activeCategoryChipText: {
     color: '#FFFFFF',
   },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -345,7 +342,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    aspectRatio: 1, // Fixed square aspect ratio for images
+    aspectRatio: 1,
     backgroundColor: '#F3F4F6',
   },
   cardImage: {
@@ -361,7 +358,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     lineHeight: 18,
-    minHeight: 36, // Guarantees 2 lines height consistency across cards
+    minHeight: 36,
   },
   cardPrice: {
     fontSize: 15,
