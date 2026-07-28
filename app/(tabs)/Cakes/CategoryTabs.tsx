@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet, BackHandler, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import Fashion from '../../../Services/Fashion';
 import Electronics from '../../../Services/Electronics';
-import CakeCarousel from './CakeCarousel';
+import CakeCarousel, { CategoryTabsHandle as CakeCarouselHandle } from './CakeCarousel';
 import { CATEGORIES, CategoryKey } from '../useHomeScreen';
 import { HEADER_HEIGHT } from '../../../components/Header';
+
+export type CategoryTabsHandle = {
+  loadMore: () => void;
+};
 
 interface CategoryTabsProps {
   scrollY?: Animated.Value;
@@ -64,9 +68,19 @@ function AnimatedChip({ cat, isActive, onPress }: AnimatedChipProps) {
   );
 }
 
-export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
+const CategoryTabs = forwardRef<CategoryTabsHandle, CategoryTabsProps>(({ scrollY }, ref) => {
   // --- Native path: local history stack ---
   const [navHistory, setNavHistory] = useState<CategoryKey[]>([BASE_CATEGORY]);
+
+  // Ref to access CakeCarousel's loadMore method
+  const cakeCarouselRef = useRef<CakeCarouselHandle>(null);
+
+  // Expose loadMore upward to parent screens
+  useImperativeHandle(ref, () => ({
+    loadMore: () => {
+      cakeCarouselRef.current?.loadMore();
+    },
+  }));
 
   // --- Web path: URL-driven state ---
   const router = useRouter();
@@ -117,7 +131,7 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
 
   // Map category keys directly to their components
   const CATEGORY_COMPONENTS: Partial<Record<CategoryKey, React.ReactNode>> = {
-    bakery: <CakeCarousel />,
+    bakery: <CakeCarousel ref={cakeCarouselRef} />,
     electronics: <Electronics />,
     fashion: <Fashion />,
   };
@@ -168,7 +182,11 @@ export default function CategoryTabs({ scrollY }: CategoryTabsProps) {
       </View>
     </View>
   );
-}
+});
+
+CategoryTabs.displayName = 'CategoryTabs';
+
+export default CategoryTabs;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
