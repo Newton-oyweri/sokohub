@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { router } from 'expo-router';
 import {
   View,
@@ -9,9 +9,11 @@ import {
   Platform,
   StatusBar,
   Image,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import CategoryTabs from './Cakes/CategoryTabs';
+import CategoryTabs, { CategoryTabsHandle } from './Cakes/CategoryTabs';
 import Account from './Account/Account';
 import Header, { HEADER_HEIGHT } from '../../components/Header';
 import DownloadAction from '../../components/DownloadAction';
@@ -54,6 +56,26 @@ export default function App() {
 
   const isPWA = useIsPWA();
 
+  // 1. Ref to trigger CategoryTabs -> CakeCarousel -> loadMore
+  const categoryTabsRef = useRef<CategoryTabsHandle>(null);
+
+  // 2. Animated scroll handler + infinite scroll bottom detector
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+        const isNearBottom =
+          layoutMeasurement.height + contentOffset.y >= contentSize.height - 250;
+
+        if (isNearBottom && activeTab === 'cakes') {
+          categoryTabsRef.current?.loadMore();
+        }
+      },
+    }
+  );
+
   return (
     <>
       {Platform.OS === 'web' && !isPWA && <DownloadAction />}
@@ -67,10 +89,7 @@ export default function App() {
           contentContainerStyle={[styles.scrollContent, { paddingTop: STATUS_BAR_HEIGHT }]}
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={[1]}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true }
-          )}
+          onScroll={handleScroll}
           scrollEventThrottle={16}
         >
           {/* Transparent Search Bar overlay on top banner */}
@@ -135,7 +154,7 @@ export default function App() {
 
           <View style={styles.contentCard}>
             {activeTab === 'cakes' ? (
-              <CategoryTabs scrollY={scrollY} />
+              <CategoryTabs ref={categoryTabsRef} scrollY={scrollY} />
             ) : (
               <Account />
             )}
