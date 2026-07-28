@@ -123,77 +123,68 @@ export default function CategoryTabs() {
       console.warn('Error fetching subcategories:', err);
     }
   };
-
-  const fetchProducts = async (
-    pageToFetch: number,
-    append: boolean,
-    overrideSubcategory: string | null = selectedSubcategory,
-    overridePriceRange: string | null = selectedPriceRange
-  ) => {
-    fetchingRef.current = true;
-    try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      let categoryIds = allCategoryIds;
-
-      if (categoryIds.length === 0) {
-        categoryIds = await fetchCakeCategoryIds();
-      }
-
-      let targetCategoryIds = categoryIds;
-      if (overrideSubcategory && categoryIds.includes(overrideSubcategory)) {
-        targetCategoryIds = [overrideSubcategory];
-      }
-
-      if (targetCategoryIds.length === 0) {
-        setProducts([]);
-        setHasMore(false);
-        return;
-      }
-
-      const from = pageToFetch * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
-      let query = supabase
-        .from('products')
-        .select('*')
-        .in('category', targetCategoryIds)
-        .eq('is_available', true);
-
-      const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
-      if (priceRange && priceRange.min !== null) {
-        query = query.gte('price', priceRange.min);
-      }
-      if (priceRange && priceRange.max !== null) {
-        query = query.lte('price', priceRange.max);
-      }
-
-      const { data, error: prodErr } = await query
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (prodErr) throw prodErr;
-
-      const fetched = data || [];
-      setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
-      setHasMore(fetched.length === PAGE_SIZE);
-      setPage(pageToFetch);
-    } catch (err: any) {
-      console.error('Error fetching bakery products:', err.message);
-      setError('Could not load products. Check your connection!');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      fetchingRef.current = false;
+const fetchProducts = async (
+  pageToFetch: number,
+  append: boolean,
+  overrideSubcategory: string | null = selectedSubcategory,
+  overridePriceRange: string | null = selectedPriceRange
+) => {
+  fetchingRef.current = true;
+  try {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
     }
-  };
+    setError(null);
 
-  const fetchBookingBanner = async () => {
+    const normalizedSubcategory =
+      overrideSubcategory === 'all' ? null : overrideSubcategory;
+
+    const from = pageToFetch * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = supabase
+      .from('products')
+      .select('*')
+      .eq('is_available', true);
+
+    if (normalizedSubcategory) {
+      // Specific subcategory chosen — filter by the subcategory itself
+      query = query.eq('category', normalizedSubcategory);
+    } else {
+      // "All" — filter directly by the top-level category, not via subcategories
+      query = query.eq('product_category_id', 'cake-bakery');
+    }
+
+    const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
+    if (priceRange && priceRange.min !== null) {
+      query = query.gte('price', priceRange.min);
+    }
+    if (priceRange && priceRange.max !== null) {
+      query = query.lte('price', priceRange.max);
+    }
+
+    const { data, error: prodErr } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (prodErr) throw prodErr;
+
+    const fetched = data || [];
+    setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
+    setHasMore(fetched.length === PAGE_SIZE);
+    setPage(pageToFetch);
+  } catch (err: any) {
+    console.error('Error fetching bakery products:', err.message);
+    setError('Could not load products. Check your connection!');
+  } finally {
+    setLoading(false);
+    setLoadingMore(false);
+    fetchingRef.current = false;
+  }
+};
+const fetchBookingBanner = async () => {
     try {
       const { count } = await supabase
         .from('products')
