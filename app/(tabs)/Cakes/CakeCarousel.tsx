@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,10 @@ type Category = {
   image_url?: string;
 };
 
+export type CategoryTabsHandle = {
+  loadMore: () => void;
+};
+
 const getHeightVariants = (width: number) => {
   const isLargeScreen = width > 600;
   const isTablet = width > 900;
@@ -41,7 +45,7 @@ const getHeightVariants = (width: number) => {
   return [280, 220, 250, 200, 260];
 };
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 20;
 
 // Price range mapping
 const PRICE_RANGES = {
@@ -52,7 +56,7 @@ const PRICE_RANGES = {
   'above3000': { min: 3000, max: null },
 };
 
-export default function CategoryTabs() {
+const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -73,6 +77,28 @@ export default function CategoryTabs() {
 
   const fetchingRef = useRef(false);
   const isNavigating = useRef(false);
+
+  // Keep latest filter/page state available to loadMore without
+  // forcing loadMore itself to be re-created (and re-imperative-handled)
+  // on every keystroke/filter change.
+  const stateRef = useRef({
+    page,
+    hasMore,
+    loading,
+    loadingMore,
+    selectedSubcategory,
+    selectedPriceRange,
+  });
+  useEffect(() => {
+    stateRef.current = {
+      page,
+      hasMore,
+      loading,
+      loadingMore,
+      selectedSubcategory,
+      selectedPriceRange,
+    };
+  }, [page, hasMore, loading, loadingMore, selectedSubcategory, selectedPriceRange]);
 
   useEffect(() => {
     initialLoad();
@@ -123,68 +149,72 @@ export default function CategoryTabs() {
       console.warn('Error fetching subcategories:', err);
     }
   };
-const fetchProducts = async (
-  pageToFetch: number,
-  append: boolean,
-  overrideSubcategory: string | null = selectedSubcategory,
-  overridePriceRange: string | null = selectedPriceRange
-) => {
-  fetchingRef.current = true;
-  try {
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
+
+  const fetchProducts = async (
+    pageToFetch: number,
+    append: boolean,
+    overrideSubcategory: string | null = selectedSubcategory,
+    overridePriceRange: string | null = selectedPriceRange
+  ) => {
+    // Guard against overlapping requests (e.g. rapid scroll-to-bottom taps)
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      const normalizedSubcategory =
+        overrideSubcategory === 'all' ? null : overrideSubcategory;
+
+      const from = pageToFetch * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('products')
+        .select('*')
+        .eq('is_available', true);
+
+      if (normalizedSubcategory) {
+        // Specific subcategory chosen — filter by the subcategory itself
+        query = query.eq('category', normalizedSubcategory);
+      } else {
+        // "All" — filter directly by the top-level category, not via subcategories
+        query = query.eq('product_category_id', 'cake-bakery');
+      }
+
+      const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
+      if (priceRange && priceRange.min !== null) {
+        query = query.gte('price', priceRange.min);
+      }
+      if (priceRange && priceRange.max !== null) {
+        query = query.lte('price', priceRange.max);
+      }
+
+      const { data, error: prodErr } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (prodErr) throw prodErr;
+
+      const fetched = data || [];
+      setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
+      setHasMore(fetched.length === PAGE_SIZE);
+      setPage(pageToFetch);
+    } catch (err: any) {
+      console.error('Error fetching bakery products:', err.message);
+      setError('Could not load products. Check your connection!');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+      fetchingRef.current = false;
     }
-    setError(null);
+  };
 
-    const normalizedSubcategory =
-      overrideSubcategory === 'all' ? null : overrideSubcategory;
-
-    const from = pageToFetch * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('is_available', true);
-
-    if (normalizedSubcategory) {
-      // Specific subcategory chosen — filter by the subcategory itself
-      query = query.eq('category', normalizedSubcategory);
-    } else {
-      // "All" — filter directly by the top-level category, not via subcategories
-      query = query.eq('product_category_id', 'cake-bakery');
-    }
-
-    const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
-    if (priceRange && priceRange.min !== null) {
-      query = query.gte('price', priceRange.min);
-    }
-    if (priceRange && priceRange.max !== null) {
-      query = query.lte('price', priceRange.max);
-    }
-
-    const { data, error: prodErr } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (prodErr) throw prodErr;
-
-    const fetched = data || [];
-    setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
-    setHasMore(fetched.length === PAGE_SIZE);
-    setPage(pageToFetch);
-  } catch (err: any) {
-    console.error('Error fetching bakery products:', err.message);
-    setError('Could not load products. Check your connection!');
-  } finally {
-    setLoading(false);
-    setLoadingMore(false);
-    fetchingRef.current = false;
-  }
-};
-const fetchBookingBanner = async () => {
+  const fetchBookingBanner = async () => {
     try {
       const { count } = await supabase
         .from('products')
@@ -220,6 +250,26 @@ const fetchBookingBanner = async () => {
     fetchBookingBanner();
     await fetchProducts(0, false);
   };
+
+  // Exposed to the parent scroll container. Call this from the parent's
+  // onScroll / onMomentumScrollEnd when the user nears the bottom.
+  const loadMore = useCallback(() => {
+    const { page: currentPage, hasMore: canLoadMore, loading: isLoading, loadingMore: isLoadingMore } =
+      stateRef.current;
+
+    if (!canLoadMore || isLoading || isLoadingMore || fetchingRef.current) return;
+
+    fetchProducts(
+      currentPage + 1,
+      true,
+      stateRef.current.selectedSubcategory,
+      stateRef.current.selectedPriceRange
+    );
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    loadMore,
+  }));
 
   const handleBookingPress = () => {
     if (isNavigating.current) return;
@@ -460,7 +510,11 @@ const fetchBookingBanner = async () => {
       )}
     </View>
   );
-}
+});
+
+CategoryTabs.displayName = 'CategoryTabs';
+
+export default CategoryTabs;
 
 const styles = StyleSheet.create({
   listContainer: {
