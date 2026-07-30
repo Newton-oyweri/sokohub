@@ -339,6 +339,30 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
     );
   };
 
+  const renderBookingCard = (height: number = 240) => (
+    <TouchableOpacity
+      key="booking-card"
+      style={[styles.tabCard, styles.bookingCard, { height }]}
+      onPress={handleBookingPress}
+      activeOpacity={0.92}
+    >
+      {bookingImageUrl && (
+        <>
+          <Image
+            source={{ uri: bookingImageUrl }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
+          <View style={styles.bookingImageOverlay} />
+        </>
+      )}
+      <View style={styles.bookingCardContent}>
+        <Text style={styles.bookingQuestion}>Got an event?</Text>
+        <Text style={styles.bookingAction}>Book now!</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   const renderResponsiveGrid = useCallback(() => {
     const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
     const isMobile = screenWidth < 600;
@@ -357,26 +381,7 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
           </View>
 
           <View style={styles.masonryColumn}>
-            <TouchableOpacity
-              style={[styles.tabCard, styles.bookingCard]}
-              onPress={handleBookingPress}
-              activeOpacity={0.92}
-            >
-              {bookingImageUrl && (
-                <>
-                  <Image
-                    source={{ uri: bookingImageUrl }}
-                    style={StyleSheet.absoluteFillObject}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.bookingImageOverlay} />
-                </>
-              )}
-              <View style={styles.bookingCardContent}>
-                <Text style={styles.bookingQuestion}>Got an event?</Text>
-                <Text style={styles.bookingAction}>Book now!</Text>
-              </View>
-            </TouchableOpacity>
+            {renderBookingCard(320)}
 
             {products
               .filter((_, i) => i % 2 === 1)
@@ -391,43 +396,28 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
 
     // PC / Tablet layout: Grid with columns based on viewport size
     const columns = numColumns;
-    const columnItems: Product[][] = Array.from({ length: columns }, () => []);
+    const columnItems: React.ReactNode[][] = Array.from({ length: columns }, () => []);
 
+    // Fixed at top of the far-right column on desktop/tablet
+    const rightColIndex = columns - 1;
+    columnItems[rightColIndex].push(renderBookingCard(230));
+
+    // Distribute remaining products across columns
     products.forEach((item, index) => {
-      const columnIndex = index % columns;
-      columnItems[columnIndex].push(item);
+      // Offset index for right column because booking card occupies position 0
+      const targetCol = index % columns;
+      const height = HEIGHT_VARIANTS[index % HEIGHT_VARIANTS.length];
+      columnItems[targetCol].push(renderProductCard(item, height));
     });
 
     return (
       <View style={styles.desktopWrapper}>
-        <TouchableOpacity
-          style={[styles.tabCard, styles.bookingCardTablet]}
-          onPress={handleBookingPress}
-          activeOpacity={0.92}
-        >
-          {bookingImageUrl && (
-            <>
-              <Image
-                source={{ uri: bookingImageUrl }}
-                style={StyleSheet.absoluteFillObject}
-                resizeMode="cover"
-              />
-              <View style={styles.bookingImageOverlay} />
-            </>
-          )}
-          <View style={styles.bookingCardContent}>
-            <Text style={styles.bookingQuestion}>Got an event?</Text>
-            <Text style={styles.bookingAction}>Book now!</Text>
-          </View>
-        </TouchableOpacity>
-
         <View style={styles.tabletGrid}>
           {columnItems.map((column, colIndex) => (
             <View key={`col-${colIndex}`} style={styles.tabletColumn}>
-              {column.map((item, itemIndex) => {
-                const height = HEIGHT_VARIANTS[itemIndex % HEIGHT_VARIANTS.length];
-                return renderProductCard(item, height);
-              })}
+              {column.map((node, itemIndex) => (
+                <React.Fragment key={itemIndex}>{node}</React.Fragment>
+              ))}
             </View>
           ))}
         </View>
@@ -575,22 +565,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   bookingCard: {
-    height: 320,
     backgroundColor: '#6b46c1',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-  },
-  bookingCardTablet: {
-    height: 160,
-    backgroundColor: '#6b46c1',
-    justify.content: 'center',
-    alignItems: 'center',
-    padding: 24,
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    position: 'relative',
   },
   bookingImageOverlay: {
     ...StyleSheet.absoluteFillObject,

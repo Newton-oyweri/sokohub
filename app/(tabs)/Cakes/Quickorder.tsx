@@ -1,59 +1,164 @@
-import { supabase } from '@/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
-  Animated,
-  Dimensions,
+  View,
+  Text,
   Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
-  View,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
-import SkeletonLoader from './SkeletonLoader';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '@/lib/supabase';
+import Quickorder from './Quickorder';
+import ProductFilters from './ProductFilters';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.78;
-const SPACING = 20;
-const ITEM_WIDTH = CARD_WIDTH + SPACING * 2;
-const PAGE_SIZE = 6;
-
-interface Product {
+type Product = {
   id: string;
-  seller_id: string;
   name: string;
-  description: string | null;
-  price: number;
-  image_urls: string[] | null;
-  post_type: 'sale' | 'booking' | 'pinned';
-}
+  price: number | string;
+  description?: string;
+  image_urls?: string[] | null;
+  image?: string;
+  seller_id?: string;
+  post_type?: string;
+};
 
-export default function QuickOrder() {
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+type Category = {
+  id: string;
+  name: string;
+  subtitle?: string;
+  image_url?: string;
+};
+
+export type CategoryTabsHandle = {
+  loadMore: () => void;
+};
+
+// Scaled heights based on viewport width to maintain consistent card proportions
+const getHeightVariants = (width: number) => {
+  const isDesktop = width >= 1200;
+  const isTablet = width >= 768 && width < 1200;
+
+  if (isDesktop) return [240, 220, 250, 210, 230];
+  if (isTablet) return [260, 240, 270, 230, 250];
+  return [280, 220, 250, 200, 260];
+};
+
+const PAGE_SIZE = 20;
+
+const PRICE_RANGES = {
+  'all': { min: null, max: null },
+  'below1000': { min: 0, max: 1000 },
+  '1000-2000': { min: 1000, max: 2000 },
+  '2000-3000': { min: 2000, max: 3000 },
+  'above3000': { min: 3000, max: null },
+};
+
+const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
   const router = useRouter();
 
-  const [pinnedProducts, setPinnedProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [bookingImageUrl, setBookingImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(2);
+
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [allCategoryIds, setAllCategoryIds] = useState<string[]>([]);
+  const [selectedPriceRange, setSelectedPriceRange] = useState<string | null>('all');
+
   const fetchingRef = useRef(false);
+  const isNavigating = useRef(false);
+
+  const stateRef = useRef({
+    page,
+    hasMore,
+    loading,
+    loadingMore,
+    selectedSubcategory,
+    selectedPriceRange,
+  });
 
   useEffect(() => {
-    fetchPinnedProducts(0, false);
+    stateRef.current = {
+      page,
+      hasMore,
+      loading,
+      loadingMore,
+      selectedSubcategory,
+      selectedPriceRange,
+    };
+  }, [page, hasMore, loading, loadingMore, selectedSubcategory, selectedPriceRange]);
 
-    // Loop a playful breathing pulse animation for the Quick Order buttons
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ])
-    ).start();
+  useEffect(() => {
+    updateNumColumns(Dimensions.get('window').width);
+    initialLoad();
+
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+      updateNumColumns(window.width);
+    });
+
+    return () => subscription?.remove();
   }, []);
 
-  const fetchPinnedProducts = async (pageToFetch: number, append: boolean) => {
+  const updateNumColumns = (width: number) => {
+    if (width >= 1400) {
+      setNumColumns(6);
+    } else if (width >= 1100) {
+      setNumColumns(5);
+    } else if (width >= 800) {
+      setNumColumns(4);
+    } else if (width >= 600) {
+      setNumColumns(3);
+    } else {
+      setNumColumns(2);
+    }
+  };
+
+  const fetchCakeCategoryIds = async (): Promise<string[]> => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('product_category_id', 'cake-bakery')
+      .eq('is_active', true);
+
+    if (error) throw error;
+    const ids = (data || []).map((cat) => cat.id);
+    setAllCategoryIds(ids);
+    return ids;
+  };
+
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name, subtitle, image_url')
+        .eq('product_category_id', 'cake-bakery')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (err) {
+      console.warn('Error fetching subcategories:', err);
+    }
+  };
+
+  const fetchProducts = async (
+    pageToFetch: number,
+    append: boolean,
+    overrideSubcategory: string | null = selectedSubcategory,
+    overridePriceRange: string | null = selectedPriceRange
+  ) => {
+    if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
       if (append) {
@@ -61,36 +166,46 @@ export default function QuickOrder() {
       } else {
         setLoading(true);
       }
+      setError(null);
+
+      const normalizedSubcategory =
+        overrideSubcategory === 'all' ? null : overrideSubcategory;
 
       const from = pageToFetch * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
-        .select('id, seller_id, name, description, price, image_urls, post_type')
-        .eq('is_available', true)
-        .eq('post_type', 'pinned')
+        .select('*')
+        .eq('is_available', true);
+
+      if (normalizedSubcategory) {
+        query = query.eq('category', normalizedSubcategory);
+      } else {
+        query = query.eq('product_category_id', 'cake-bakery');
+      }
+
+      const priceRange = PRICE_RANGES[overridePriceRange as keyof typeof PRICE_RANGES];
+      if (priceRange && priceRange.min !== null) {
+        query = query.gte('price', priceRange.min);
+      }
+      if (priceRange && priceRange.max !== null) {
+        query = query.lte('price', priceRange.max);
+      }
+
+      const { data, error: prodErr } = await query
         .order('created_at', { ascending: false })
-        .order('id', { ascending: true })
         .range(from, to);
 
-      if (error) throw error;
+      if (prodErr) throw prodErr;
 
-      const formattedData: Product[] = (data || []).map((item) => ({
-        id: item.id,
-        seller_id: item.seller_id ?? '',
-        name: item.name,
-        description: item.description ?? null,
-        price: item.price ?? 0,
-        image_urls: item.image_urls ?? null,
-        post_type: item.post_type ?? 'pinned',
-      }));
-
-      setPinnedProducts(prev => (append ? [...prev, ...formattedData] : formattedData));
-      setHasMore(formattedData.length === PAGE_SIZE);
+      const fetched = data || [];
+      setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
+      setHasMore(fetched.length === PAGE_SIZE);
       setPage(pageToFetch);
-    } catch (error) {
-      console.error('Error fetching pinned products:', error);
+    } catch (err: any) {
+      console.error('Error fetching bakery products:', err.message);
+      setError('Could not load products. Check your connection!');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -98,320 +213,452 @@ export default function QuickOrder() {
     }
   };
 
+  const fetchBookingBanner = async () => {
+    try {
+      const { count } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('post_type', 'booking')
+        .eq('is_available', true)
+        .not('image_urls', 'is', null);
+
+      const totalCount = count || 0;
+      if (totalCount > 0) {
+        const randomOffset = Math.floor(Math.random() * totalCount);
+        const { data } = await supabase
+          .from('products')
+          .select('image_urls')
+          .eq('post_type', 'booking')
+          .eq('is_available', true)
+          .not('image_urls', 'is', null)
+          .range(randomOffset, randomOffset)
+          .single();
+
+        if (data?.image_urls && Array.isArray(data.image_urls) && data.image_urls.length > 0) {
+          setBookingImageUrl(data.image_urls[0]);
+        }
+      }
+    } catch (err) {
+      console.warn('Booking banner fetch issue:', err);
+    }
+  };
+
+  const initialLoad = async () => {
+    await fetchSubcategories();
+    await fetchCakeCategoryIds();
+    fetchBookingBanner();
+    await fetchProducts(0, false);
+  };
+
   const loadMore = useCallback(() => {
-    if (fetchingRef.current || !hasMore) return;
-    fetchPinnedProducts(page + 1, true);
-  }, [hasMore, page]);
+    const { page: currentPage, hasMore: canLoadMore, loading: isLoading, loadingMore: isLoadingMore } =
+      stateRef.current;
+
+    if (!canLoadMore || isLoading || isLoadingMore || fetchingRef.current) return;
+
+    fetchProducts(
+      currentPage + 1,
+      true,
+      stateRef.current.selectedSubcategory,
+      stateRef.current.selectedPriceRange
+    );
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    loadMore,
+  }));
+
+  const handleBookingPress = () => {
+    if (isNavigating.current) return;
+    isNavigating.current = true;
+    router.push({ pathname: '../bookproducts' });
+    setTimeout(() => {
+      isNavigating.current = false;
+    }, 500);
+  };
+
+  const handlePriceFilterChange = (range: string | null) => {
+    setSelectedPriceRange(range);
+    setPage(0);
+    setHasMore(true);
+    fetchProducts(0, false, selectedSubcategory, range);
+  };
+
+  const handleSubcategoryChange = (categoryId: string | null) => {
+    setSelectedSubcategory(categoryId);
+    setPage(0);
+    setHasMore(true);
+    fetchProducts(0, false, categoryId, selectedPriceRange);
+  };
 
   const getProductImage = (item: Product) => {
-    if (item.image_urls && item.image_urls.length > 0) {
+    if (item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) {
       return { uri: item.image_urls[0] };
+    }
+    if (item.image) {
+      return typeof item.image === 'string' ? { uri: item.image } : item.image;
     }
     return undefined;
   };
 
-  const renderSkeleton = () => {
+  const handleProductPress = (item: Product) => {
+    router.push({
+      pathname: '../order',
+      params: {
+        id: item.id,
+        name: item.name,
+        price: typeof item.price === 'number' ? item.price.toString() : item.price,
+        seller_id: item.seller_id || '',
+        description: item.description || 'Delicious treat',
+        image_urls: JSON.stringify(item.image_urls || []),
+        post_type: item.post_type || 'sale',
+      },
+    });
+  };
+
+  const renderProductCard = (item: Product, height: number) => {
+    const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+    const imageSource = getProductImage(item);
+
     return (
-      <View style={styles.skeletonContainer}>
-        {[1, 2, 3].map((_, index) => (
-          <View key={index} style={[styles.card, styles.skeletonCard]}>
-            <View style={styles.imageContainer}>
-              <SkeletonLoader style={styles.skeletonImage} />
-            </View>
-            <View style={styles.details}>
-              <View style={styles.headerRow}>
-                <SkeletonLoader style={styles.skeletonTitle} />
-              </View>
-              <SkeletonLoader style={styles.skeletonDescription} />
-              <View style={styles.priceRow}>
-                <SkeletonLoader style={styles.skeletonPrice} />
-                <SkeletonLoader style={styles.skeletonButton} />
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
+      <TouchableOpacity
+        key={item.id}
+        style={[styles.tabCard, { height }]}
+        onPress={() => handleProductPress(item)}
+        activeOpacity={0.95}
+      >
+        <Image source={imageSource} style={styles.tabImage} resizeMode="cover" />
+        <View style={styles.tabOverlay}>
+          <Text style={styles.tabLabel} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.tabPrice}>KSh {price.toFixed(2)}</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
-  const renderPinnedProduct = ({ item, index }: { item: Product; index: number }) => {
-    const inputRange = [
-      (index - 1) * ITEM_WIDTH,
-      index * ITEM_WIDTH,
-      (index + 1) * ITEM_WIDTH,
+  const renderBookingCard = (height: number = 240) => (
+    <TouchableOpacity
+      key="booking-card"
+      style={[styles.tabCard, styles.bookingCard, { height }]}
+      onPress={handleBookingPress}
+      activeOpacity={0.92}
+    >
+      {bookingImageUrl && (
+        <>
+          <Image
+            source={{ uri: bookingImageUrl }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
+          <View style={styles.bookingImageOverlay} />
+        </>
+      )}
+      <View style={styles.bookingCardContent}>
+        <Text style={styles.bookingQuestion}>Got an event?</Text>
+        <Text style={styles.bookingAction}>Book now!</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderResponsiveGrid = useCallback(() => {
+    const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
+    const isMobile = screenWidth < 600;
+
+    // Mobile layout: Two-column masonry layout
+    if (isMobile) {
+      return (
+        <View style={styles.masonryContainer}>
+          <View style={styles.masonryColumn}>
+            {products
+              .filter((_, i) => i % 2 === 0)
+              .map((item, i) => {
+                const height = HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length];
+                return renderProductCard(item, height);
+              })}
+          </View>
+
+          <View style={styles.masonryColumn}>
+            {renderBookingCard(320)}
+
+            {products
+              .filter((_, i) => i % 2 === 1)
+              .map((item, i) => {
+                const height = HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length];
+                return renderProductCard(item, height);
+              })}
+          </View>
+        </View>
+      );
+    }
+
+    // Tablet & Desktop layout: Uniform natural left-to-right grid distribution
+    const columns = numColumns;
+    const columnItems: React.ReactNode[][] = Array.from({ length: columns }, () => []);
+
+    // Build items array with booking card inline at position 0
+    const allCards = [
+      renderBookingCard(230),
+      ...products.map((item, index) => {
+        const height = HEIGHT_VARIANTS[index % HEIGHT_VARIANTS.length];
+        return renderProductCard(item, height);
+      }),
     ];
 
-    const scale = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.88, 1.04, 0.88],
-      extrapolate: 'clamp',
+    // Distribute evenly across columns top-left to bottom-right
+    allCards.forEach((cardNode, index) => {
+      const targetCol = index % columns;
+      columnItems[targetCol].push(cardNode);
     });
 
-    const imageSource = getProductImage(item);
-    const formattedPrice = `KSh ${Number(item.price).toLocaleString()}`;
-
     return (
-      <Animated.View style={[{ transform: [{ scale }] }]}>
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.95}
-          onPress={() => router.push({
-            pathname: '../review',
-            params: { id: item.id, post_type: item.post_type }
-          })}
-        >
-          <View style={styles.imageContainer}>
-            <Image
-              source={imageSource}
-              style={styles.cakeImage}
-              resizeMode="cover"
-            />
-            <View style={styles.imageOverlay} />
-          </View>
-
-          <View style={styles.details}>
-            <View style={styles.headerRow}>
-              <Text style={styles.productName} numberOfLines={1}>
-                {item.name}
-              </Text>
+      <View style={styles.desktopWrapper}>
+        <View style={styles.tabletGrid}>
+          {columnItems.map((column, colIndex) => (
+            <View key={`col-${colIndex}`} style={styles.tabletColumn}>
+              {column.map((node, itemIndex) => (
+                <React.Fragment key={itemIndex}>{node}</React.Fragment>
+              ))}
             </View>
-
-            <Text style={styles.description} numberOfLines={2}>
-              {item.description || 'No description available.'}
-            </Text>
-
-            <View style={styles.priceRow}>
-              <Text style={styles.price}>{formattedPrice}</Text>
-
-              {/* Animated Wrapper focusing scale exclusively around the button view */}
-              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                <TouchableOpacity
-                  style={styles.orderButton}
-                  onPress={() => router.push({
-                    pathname: '../order',
-                    params: {
-                      id: item.id,
-                      name: item.name,
-                      price: item.price.toString(),
-                      seller_id: item.seller_id,
-                      description: item.description || 'Delicious treat',
-                      image_urls: JSON.stringify(item.image_urls),
-                      post_type: item.post_type,
-                    }
-                  })}
-                >
-                  <Text style={styles.orderButtonText}>Quick Order</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
+          ))}
+        </View>
+      </View>
     );
+  }, [products, bookingImageUrl, screenWidth, numColumns]);
+
+  const renderContent = () => {
+    if (loading) {
+      const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
+      return (
+        <View style={styles.masonryContainer}>
+          <View style={styles.masonryColumn}>
+            {[0, 2, 4].map((i) => (
+              <View
+                key={`left-skel-${i}`}
+                style={[styles.skeletonCard, { height: HEIGHT_VARIANTS[i % HEIGHT_VARIANTS.length] }]}
+              />
+            ))}
+          </View>
+          <View style={styles.masonryColumn}>
+            <View style={[styles.skeletonCard, { height: 300 }]} />
+            {[0, 2].map((i) => (
+              <View
+                key={`right-skel-${i}`}
+                style={[styles.skeletonCard, { height: HEIGHT_VARIANTS[(i + 2) % HEIGHT_VARIANTS.length] }]}
+              />
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerState}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={initialLoad} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (products.length === 0) {
+      return (
+        <View style={styles.centerState}>
+          <Ionicons name="fast-food-outline" size={64} color="#cbd5e1" />
+          <Text style={styles.emptyTitle}>No items available</Text>
+          <Text style={styles.emptySubtitle}>Try adjusting your filters</Text>
+        </View>
+      );
+    }
+
+    return renderResponsiveGrid();
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Weekly Specials</Text>
-        <Text style={styles.subtitle}>
-          Fresh picks, exclusive deals, and customer favorites this week.
-        </Text>
+    <View style={styles.listContainer}>
+      <View style={styles.headerContainer}>
+        <View style={styles.quickOrderWrapper}>
+          <Quickorder />
+        </View>
+
+        <ProductFilters
+          onPriceFilterChange={handlePriceFilterChange}
+          selectedPriceRange={selectedPriceRange}
+          onSubcategoryChange={handleSubcategoryChange}
+          subcategories={subcategories}
+          selectedSubcategory={selectedSubcategory}
+        />
       </View>
 
-      {loading && pinnedProducts.length === 0 ? (
-        renderSkeleton()
-      ) : pinnedProducts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="pin-outline" size={64} color="#cbd5e1" />
-          <Text style={styles.emptyTitle}>No Pinned Items</Text>
-          <Text style={styles.emptySubtitle}>Check back later for weekly specials!</Text>
+      {renderContent()}
+
+      {loadingMore && (
+        <View style={styles.footerLoading}>
+          <ActivityIndicator size="small" color="#6b46c1" />
         </View>
-      ) : (
-        <Animated.FlatList
-          data={pinnedProducts}
-          renderItem={renderPinnedProduct}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={ITEM_WIDTH}
-          decelerationRate="fast"
-          contentContainerStyle={styles.flatlistContent}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: true }
-          )}
-          onEndReachedThreshold={0.5}
-          onEndReached={loadMore}
-          ListFooterComponent={
-            loadingMore ? (
-              <View style={styles.footerLoading}>
-                <SkeletonLoader style={styles.skeletonFooterCard} />
-              </View>
-            ) : null
-          }
-        />
       )}
     </View>
   );
-}
+});
+
+CategoryTabs.displayName = 'CategoryTabs';
+
+export default CategoryTabs;
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'transparent'
+  listContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    paddingBottom: 50,
+    width: '100%',
   },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    marginTop: 10,
+  headerContainer: {
+    width: '100%',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a'
+  desktopWrapper: {
+    width: '100%',
+    maxWidth: 1400,
+    alignSelf: 'center',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 4,
+  masonryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    width: '100%',
   },
-  flatlistContent: {
-    paddingHorizontal: (width - CARD_WIDTH) / 2,
-    paddingVertical: 10,
+  quickOrderWrapper: {
+    marginBottom: 8,
+    minHeight: 60,
+    width: '100%',
   },
-  footerLoading: {
+  masonryColumn: {
+    width: '48.5%',
+    gap: 12,
+  },
+  tabletGrid: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    width: '100%',
+    gap: 12,
+  },
+  tabletColumn: {
+    flex: 1,
+    gap: 12,
+  },
+  skeletonCard: {
+    width: '100%',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 20,
+  },
+  tabCard: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    backgroundColor: '#fff',
+  },
+  bookingCard: {
+    backgroundColor: '#6b46c1',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
   },
-  skeletonFooterCard: {
-    width: CARD_WIDTH * 0.4,
-    height: 235,
-    borderRadius: 28,
-    marginHorizontal: SPACING / 2,
+  bookingImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(107, 70, 193, 0.45)',
   },
-  card: {
-    width: CARD_WIDTH,
-    backgroundColor: '#fff',
-    borderRadius: 28,
-    overflow: 'hidden',
-    marginHorizontal: SPACING / 2,
-    shadowColor: '#6b46c1',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 25,
-    elevation: 15,
+  bookingCardContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
-  imageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: 235,
+  bookingQuestion: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  cakeImage: {
+  bookingAction: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginTop: 4,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 6,
+  },
+  tabImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#f1f5f9',
   },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(107, 70, 193, 0.12)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+  tabOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    padding: 10,
   },
-  details: {
-    padding: 18
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  productName: {
-    fontSize: 19,
+  tabLabel: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1e293b',
-    flex: 1,
-    marginRight: 10,
-  },
-  description: {
-    fontSize: 14.5,
-    color: '#64748b',
-    lineHeight: 21,
-    marginBottom: 12,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  price: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#6b46c1',
-  },
-  orderButton: {
-    backgroundColor: '#6b46c1',
-    paddingVertical: 13,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-  },
-  orderButtonText: {
     color: '#fff',
-    fontSize: 15.5,
-    fontWeight: '700',
   },
-  emptyContainer: {
+  tabPrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#f1e8ff',
+    marginTop: 2,
+  },
+  centerState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    marginBottom: 8,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    fontWeight: '600',
+    color: '#475569',
     marginTop: 12,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#94a3b8',
     marginTop: 4,
-    textAlign: 'center',
   },
-  skeletonContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: (width - CARD_WIDTH) / 2,
-    paddingVertical: 10,
-    gap: 20,
+  retryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#6b46c1',
   },
-  skeletonCard: {
-    opacity: 0.8,
+  retryText: {
+    color: '#fff',
+    fontWeight: '600',
   },
-  skeletonImage: {
-    width: '100%',
-    height: 235,
-    borderRadius: 28,
-  },
-  skeletonTitle: {
-    width: 120,
-    height: 20,
-    borderRadius: 4,
-  },
-  skeletonDescription: {
-    width: '100%',
-    height: 40,
-    borderRadius: 4,
-    marginBottom: 12,
-  },
-  skeletonPrice: {
-    width: 80,
-    height: 26,
-    borderRadius: 4,
-  },
-  skeletonButton: {
-    width: 100,
-    height: 44,
-    borderRadius: 16,
+  footerLoading: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });
