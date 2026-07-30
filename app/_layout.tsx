@@ -3,8 +3,6 @@ import {
   StatusBar,
   Linking,
   View,
-  StyleSheet,
-  useWindowDimensions,
 } from 'react-native';
 import { Stack, useRouter, SplashScreen } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -14,15 +12,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NotificationSetup from '@/components/NotificationSetup';
 import { configureNotifications } from "@/lib/notifications";
 
-const WIDE_LAYOUT_BREAKPOINT = 900;
-const APP_COLUMN_WIDTH = 480;
-
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isWideLayout = width >= WIDE_LAYOUT_BREAKPOINT;
 
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
@@ -71,58 +64,20 @@ export default function RootLayout() {
     return null;
   }
 
-  const appContent = (
-    <>
-      <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
-
-      {/* Global setup component mounted */}
-      <NotificationSetup />
-
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="auth" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="reset-password" />
-      </Stack>
-    </>
-  );
-
   return (
     <SafeAreaProvider>
-      {isWideLayout ? (
-        <View style={styles.wideRoot}>
-          <View style={styles.brandingPanel} />
-          <View style={styles.wideAppColumn}>
-            {appContent}
-          </View>
-          <View style={styles.brandingPanel} />
-        </View>
-      ) : (
-        <View style={{ flex: 1 }}>
-          {appContent}
-        </View>
-      )}
+      <View style={{ flex: 1 }}>
+        <StatusBar barStyle="dark-content" translucent={true} backgroundColor="transparent" />
+
+        {/* Global setup component mounted */}
+        <NotificationSetup />
+
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="auth" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="reset-password" />
+        </Stack>
+      </View>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  wideRoot: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#ede9fe',
-  },
-  wideAppColumn: {
-    width: APP_COLUMN_WIDTH,
-    height: '100%',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-  },
-  brandingPanel: {
-    flex: 1,
-    backgroundColor: '#ede9fe',
-  },
-});
-
