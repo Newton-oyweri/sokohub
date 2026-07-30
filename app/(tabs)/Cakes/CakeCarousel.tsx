@@ -36,18 +36,18 @@ export type CategoryTabsHandle = {
   loadMore: () => void;
 };
 
+// Scaled heights based on viewport width to maintain consistent card proportions
 const getHeightVariants = (width: number) => {
-  const isLargeScreen = width > 600;
-  const isTablet = width > 900;
+  const isDesktop = width >= 1200;
+  const isTablet = width >= 768 && width < 1200;
 
-  if (isTablet) return [340, 280, 310, 260, 320];
-  if (isLargeScreen) return [300, 240, 270, 220, 290];
-  return [280, 220, 250, 200, 260];
+  if (isDesktop) return [240, 220, 250, 210, 230]; // Compact for PC columns
+  if (isTablet) return [260, 240, 270, 230, 250];  // Balanced for tablet
+  return [280, 220, 250, 200, 260];                // Masonry style for mobile
 };
 
 const PAGE_SIZE = 20;
 
-// Price range mapping
 const PRICE_RANGES = {
   'all': { min: null, max: null },
   'below1000': { min: 0, max: 1000 },
@@ -69,7 +69,6 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(2);
 
-  // Filter states
   const [subcategories, setSubcategories] = useState<Category[]>([]);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [allCategoryIds, setAllCategoryIds] = useState<string[]>([]);
@@ -78,9 +77,6 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
   const fetchingRef = useRef(false);
   const isNavigating = useRef(false);
 
-  // Keep latest filter/page state available to loadMore without
-  // forcing loadMore itself to be re-created (and re-imperative-handled)
-  // on every keystroke/filter change.
   const stateRef = useRef({
     page,
     hasMore,
@@ -89,6 +85,7 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
     selectedSubcategory,
     selectedPriceRange,
   });
+
   useEffect(() => {
     stateRef.current = {
       page,
@@ -101,6 +98,7 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
   }, [page, hasMore, loading, loadingMore, selectedSubcategory, selectedPriceRange]);
 
   useEffect(() => {
+    updateNumColumns(Dimensions.get('window').width);
     initialLoad();
 
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -111,10 +109,15 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
     return () => subscription?.remove();
   }, []);
 
+  // Adaptive columns for mobile, tablet, desktop, and ultra-wide screens
   const updateNumColumns = (width: number) => {
-    if (width > 1024) {
+    if (width >= 1400) {
+      setNumColumns(6);
+    } else if (width >= 1100) {
+      setNumColumns(5);
+    } else if (width >= 800) {
       setNumColumns(4);
-    } else if (width > 768) {
+    } else if (width >= 600) {
       setNumColumns(3);
     } else {
       setNumColumns(2);
@@ -156,7 +159,6 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
     overrideSubcategory: string | null = selectedSubcategory,
     overridePriceRange: string | null = selectedPriceRange
   ) => {
-    // Guard against overlapping requests (e.g. rapid scroll-to-bottom taps)
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
@@ -179,10 +181,8 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
         .eq('is_available', true);
 
       if (normalizedSubcategory) {
-        // Specific subcategory chosen — filter by the subcategory itself
         query = query.eq('category', normalizedSubcategory);
       } else {
-        // "All" — filter directly by the top-level category, not via subcategories
         query = query.eq('product_category_id', 'cake-bakery');
       }
 
@@ -251,8 +251,6 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
     await fetchProducts(0, false);
   };
 
-  // Exposed to the parent scroll container. Call this from the parent's
-  // onScroll / onMomentumScrollEnd when the user nears the bottom.
   const loadMore = useCallback(() => {
     const { page: currentPage, hasMore: canLoadMore, loading: isLoading, loadingMore: isLoadingMore } =
       stateRef.current;
@@ -343,9 +341,10 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
 
   const renderResponsiveGrid = useCallback(() => {
     const HEIGHT_VARIANTS = getHeightVariants(screenWidth);
-    const isTablet = screenWidth > 768;
+    const isMobile = screenWidth < 600;
 
-    if (!isTablet) {
+    // Mobile layout: Two-column masonry layout
+    if (isMobile) {
       return (
         <View style={styles.masonryContainer}>
           <View style={styles.masonryColumn}>
@@ -390,6 +389,7 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
       );
     }
 
+    // PC / Tablet layout: Grid with columns based on viewport size
     const columns = numColumns;
     const columnItems: Product[][] = Array.from({ length: columns }, () => []);
 
@@ -399,7 +399,7 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
     });
 
     return (
-      <View>
+      <View style={styles.desktopWrapper}>
         <TouchableOpacity
           style={[styles.tabCard, styles.bookingCardTablet]}
           onPress={handleBookingPress}
@@ -421,9 +421,9 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
           </View>
         </TouchableOpacity>
 
-        <View style={[styles.tabletGrid, { gap: 12 }]}>
+        <View style={styles.tabletGrid}>
           {columnItems.map((column, colIndex) => (
-            <View key={`col-${colIndex}`} style={[styles.tabletColumn, { flex: 1 / columns }]}>
+            <View key={`col-${colIndex}`} style={styles.tabletColumn}>
               {column.map((item, itemIndex) => {
                 const height = HEIGHT_VARIANTS[itemIndex % HEIGHT_VARIANTS.length];
                 return renderProductCard(item, height);
@@ -449,7 +449,7 @@ const CategoryTabs = forwardRef<CategoryTabsHandle>((_props, ref) => {
             ))}
           </View>
           <View style={styles.masonryColumn}>
-            <View style={[styles.skeletonCard, { height: 420 }]} />
+            <View style={[styles.skeletonCard, { height: 300 }]} />
             {[0, 2].map((i) => (
               <View
                 key={`right-skel-${i}`}
@@ -526,6 +526,11 @@ const styles = StyleSheet.create({
   headerContainer: {
     width: '100%',
   },
+  desktopWrapper: {
+    width: '100%',
+    maxWidth: 1400,
+    alignSelf: 'center',
+  },
   masonryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -545,13 +550,12 @@ const styles = StyleSheet.create({
   tabletGrid: {
     flexDirection: 'row',
     paddingVertical: 4,
-    paddingHorizontal: 0,
-    alignSelf: 'center',
     width: '100%',
+    gap: 12,
   },
   tabletColumn: {
+    flex: 1,
     gap: 12,
-    paddingHorizontal: 4,
   },
   skeletonCard: {
     width: '100%',
@@ -571,19 +575,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   bookingCard: {
-    height: 420,
+    height: 320,
     backgroundColor: '#6b46c1',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   bookingCardTablet: {
-    height: 200,
+    height: 160,
     backgroundColor: '#6b46c1',
-    justifyContent: 'center',
+    justify.content: 'center',
     alignItems: 'center',
     padding: 24,
-    marginBottom: 12,
+    marginBottom: 16,
     borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
@@ -598,7 +602,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   bookingQuestion: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600',
     color: '#ffffff',
     textAlign: 'center',
@@ -607,10 +611,10 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   bookingAction: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#ffffff',
-    marginTop: 6,
+    marginTop: 4,
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -632,12 +636,12 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   tabLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
   },
   tabPrice: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#f1e8ff',
     marginTop: 2,
@@ -678,4 +682,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
